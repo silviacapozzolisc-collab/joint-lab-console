@@ -7,7 +7,7 @@
  * Strategy: network first (a newly installed version always wins), cache as fallback.
  * Nothing here ever talks to the internet: only same-origin files are handled.
  */
-const CACHE = "jlc-1.1.0";
+const CACHE = "jlc-1.1.1";
 const SHELL = ["./", "index.html", "manifest.webmanifest",
   "icon-32.png", "icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
 

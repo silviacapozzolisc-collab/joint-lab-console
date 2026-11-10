@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Joint Lab Console</title>
 <meta name="theme-color" content="#0891b2" />
-<meta name="app-version" content="1.1.0" />
+<meta name="app-version" content="1.1.1" />
 <!-- installed-app bits: used when served by the desktop launcher (http://localhost:47615) -->
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
@@ -870,14 +870,11 @@ class JointConsole{
       const dev=await navigator.bluetooth.requestDevice({filters,optionalServices:[NUS_SVC]});
       const other=CONSOLES.find(c=>c!==this&&c.S.device&&c.S.device.id===dev.id&&c.S.connected);
       if(other){ this.setStatus("Disconnected"); this.banner(`This PCB is already connected in console ${other.id}. Pick the other one.`,"warn"); return; }
-      this.S.device=dev; dev.addEventListener("gattserverdisconnected",()=>this.onDisconnected());
-      this.setStatus("Connecting…","busy");
-      const server=await dev.gatt.connect();
-      const svc=await server.getPrimaryService(NUS_SVC);
-      this.S.rx=await svc.getCharacteristic(NUS_RX);
-      this.S.tx=await svc.getCharacteristic(NUS_TX);
-      await this.S.tx.startNotifications();
-      this.S.tx.addEventListener("characteristicvaluechanged",(ev)=>this.onNotify(ev));
+      this.S.device=dev;
+      if(!dev._jlcHooked){ dev._jlcHooked=true; dev.addEventListener("gattserverdisconnected",()=>this.onDisconnected()); }
+      const {rx,tx}=await this.openGatt(dev);
+      this.S.rx=rx; this.S.tx=tx;
+      if(!tx._jlcHooked){ tx._jlcHooked=true; tx.addEventListener("characteristicvaluechanged",(ev)=>this.onNotify(ev)); }
       this.S.connected=true; this.S.rxBuf="";
       this.setStatus("Connected","on"); this.setControls(true); this.banner("");
       this.r.subtitle.textContent=dev.name||"device";
@@ -890,8 +887,44 @@ class JointConsole{
       if(this.S.joint) this.banner("Same joint as before? Confirm it below, or pick another one.","info");
     }catch(e){
       if(e&&e.name==="NotFoundError"){ this.setStatus("Disconnected"); this.log("Device selection cancelled.","sys"); }
-      else { this.setStatus("Error","err"); this.banner("Connection failed: "+(e.message||e),"err"); this.log("Connect error: "+(e.message||e),"e"); }
+      else { this.setStatus("Error","err"); this.banner("Connection failed: "+(e.message||e)+(e.hint||""),"err"); this.log("Connect error: "+(e.message||e),"e"); }
     }
+  }
+  /* GATT connect + service discovery with retries.
+     Android often reports connect() as done and then drops the link while the
+     services are still being discovered ("GATT Server is disconnected", Android
+     status 133): wait a moment, check the link, retry — what native BLE apps do. */
+  async openGatt(dev){
+    const wait=(ms)=>new Promise(r=>setTimeout(r,ms));
+    const isAndroid=/Android/i.test(navigator.userAgent);
+    const tries=isAndroid?5:3;
+    let last=null;
+    for(let i=1;i<=tries;i++){
+      try{
+        this.setStatus(i>1?`Connecting… (try ${i}/${tries})`:"Connecting…","busy");
+        const server=await dev.gatt.connect();
+        if(isAndroid) await wait(i===1?500:900);          // let Android finish service discovery
+        if(!server.connected) throw new Error("GATT Server is disconnected");
+        const svc=await server.getPrimaryService(NUS_SVC);
+        const rx=await svc.getCharacteristic(NUS_RX);
+        const tx=await svc.getCharacteristic(NUS_TX);
+        await tx.startNotifications();
+        if(i>1) this.log(`Connected at try ${i}.`,"sys");
+        return {rx,tx};
+      }catch(e){
+        last=e;
+        this.log(`Connect try ${i}/${tries} failed: ${e.message||e}`,"e");
+        /* The service really is not there (wrong firmware / wrong device): retrying won't help. */
+        if(e&&e.name==="NotFoundError"&&/service|characteristic/i.test(e.message||"")) break;
+        try{ if(dev.gatt.connected) dev.gatt.disconnect(); }catch{}
+        if(i<tries) await wait(700*i);
+      }
+    }
+    const err=new Error((last&&last.message)||"connection failed");
+    err.hint=/Android/i.test(navigator.userAgent)
+      ? " — On the tablet: switch Bluetooth off and on, make sure the PCB is not connected to another device or app (e.g. a PC or nRF Connect), and if the PCB is listed in Android's Bluetooth settings as a paired device, choose ‘Forget’. Then press Connect again."
+      : " — Switch the PCB off and on, make sure it is not connected to another device, then press Connect again.";
+    throw err;
   }
   onDisconnected(){
     if(!this.S.connected) return;
