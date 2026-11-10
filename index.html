@@ -1,0 +1,1924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Joint Lab Console</title>
+<meta name="theme-color" content="#0891b2" />
+<meta name="app-version" content="1.1.0" />
+<!-- installed-app bits: used when served by the desktop launcher (http://localhost:47615) -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<style>
+  :root{
+    --bg:#ffffff; --bg2:#ffffff; --panel:#ffffff; --panel2:#f6f8fb; --soft:#f6f8fb;
+    --line:#d8e0e9; --line2:#b8c5d3; --ink:#0f1f2e; --muted:#4b5f72; --muted2:#6b7f91;
+    --teal:#0891b2; --teal-d:#0e7490;
+    --c1:#0891b2; --c2:#d97706; --c3:#c026d3;
+    --ok:#059669; --warn:#b45309; --err:#dc2626; --rec:#e11d48;
+    --shadow:0 1px 2px #0f1f2e0f,0 2px 8px #0f1f2e0d;
+    --r:16px; --r2:12px;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{font-family:var(--ui);font-size:16px;color:var(--ink);-webkit-font-smoothing:antialiased;
+    background:#ffffff;}
+  .wrap{max-width:1800px;margin:0 auto;padding:12px 18px 40px}
+
+  /* ---------- top bar ---------- */
+  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 16px;
+    border:1px solid var(--line);border-radius:var(--r);background:#fff;box-shadow:var(--shadow)}
+  .brand{display:flex;align-items:center;gap:14px;margin-right:auto}
+  .logo{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+    background:conic-gradient(from 210deg,var(--c1),var(--c3),var(--c2),var(--c1));box-shadow:0 2px 8px #0f1f2e26}
+  .logo svg{width:23px;height:23px}
+  .brand h1{font-size:20px;margin:0}
+  .brand p{margin:2px 0 0;font-size:13.5px;color:var(--muted)}
+  @media(max-width:1750px){.brand p{display:none}}
+  @media(max-width:1100px){.brand h1,.bothlbl{display:none}.brand{margin-right:0}.tabs{margin-right:auto}}
+  #gBanner.show{padding:7px 14px;font-size:14.5px}
+  .card .hd .rate{font-size:14.5px}.card .hd .rate b{font-family:var(--mono);color:var(--muted)}
+  .globalbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .globalbar .hint{margin-right:4px}
+
+  .btn{font-family:var(--ui);font-size:16.5px;font-weight:600;color:var(--ink);cursor:pointer;
+    border:1px solid var(--line);background:#f1f5f9;border-radius:12px;padding:11px 17px;
+    transition:transform .06s ease,background .15s,border-color .15s;white-space:nowrap}
+  .btn:hover{background:#e5ebf2;border-color:var(--line2)}
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.primary{background:linear-gradient(180deg,var(--acc),var(--acc-d));border-color:var(--acc-d);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.rec{background:linear-gradient(180deg,#ff6b86,#e23a5c);border-color:#ff7c93;color:#2a0a12}
+  /* action colours: start = green, stop = red, calibrate = yellow, mark both = PCB A→B */
+  .btn.go{background:linear-gradient(180deg,#22c55e,#16a34a);border-color:#15803d;color:#fff}
+  .btn.halt{background:linear-gradient(180deg,#ef4444,#dc2626);border-color:#b91c1c;color:#fff}
+  .btn.cal{background:linear-gradient(180deg,#fcd34d,#facc15);border-color:#d6a50b;color:#3a2a00}
+  .btn.mark{background:linear-gradient(90deg,#22b8d8,#9b7bf7);border-color:#7c5ce0;color:#fff}
+  .btn.go:hover,.btn.halt:hover,.btn.cal:hover,.btn.mark:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn.danger{border-color:#f1b5b5;color:#c81e1e}
+  .btn.danger:hover{background:#fdecec}
+  .btn.sm{font-size:15px;padding:9px 14px;border-radius:10px}
+
+  /* ---------- PCB tabs (one console per page) ---------- */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{--acc:#0891b2;--acc-d:#0e7490;position:relative;top:1px;display:flex;align-items:center;gap:13px;
+    padding:6px 16px 6px 8px;min-width:200px;cursor:pointer;text-align:left;font-family:var(--ui);color:var(--muted);
+    border:1px solid var(--line);border-radius:12px;background:var(--soft);transition:background .15s,color .15s}
+  .tab[data-id="B"]{--acc:#7c3aed;--acc-d:#6d28d9}
+  .tab:hover{background:#eef3f8;color:var(--ink)}
+  .tab.active{background:color-mix(in srgb,var(--acc) 9%,#fff);color:var(--ink);border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+  .tab .badge{width:32px;height:32px;font-size:16px}
+  .tab .tt{display:flex;flex-direction:column;gap:2px;margin-right:auto;min-width:0}
+  .tab .tt b{font-size:17px}
+  .tab .tt span{font-size:13.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+  .tab .dot{width:12px;height:12px}
+  .tab.on .dot{background:var(--ok);box-shadow:0 0 10px 1px var(--ok)}
+  .tab.busy .dot{background:var(--warn);box-shadow:0 0 10px 1px var(--warn)}
+  .tab.err .dot{background:var(--err)}
+  .tab .rec-led{display:none}
+  .tab.recording .rec-led{display:inline-block}
+  .tab.alert::after{content:"!";position:absolute;top:-9px;right:-7px;width:22px;height:22px;border-radius:50%;
+    background:var(--warn);color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center}
+  .tab.alert.alert-err::after{background:var(--err);color:#fff}
+  .tab:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+  /* ---------- console (full page) ---------- */
+  .consoles{display:block}
+  .jc{--acc:#0891b2;--acc-d:#0e7490;display:flex;flex-direction:column;gap:14px;min-width:0;
+    margin-top:12px;border:1px solid var(--line);border-top:4px solid var(--acc);border-radius:var(--r);
+    padding:14px 16px;background:#fff;box-shadow:var(--shadow)}
+  .jc[data-id="B"]{--acc:#7c3aed;--acc-d:#6d28d9}
+  .jc-layout{display:flex;flex-direction:column;gap:14px}
+  .main-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+  /* Commands · Session capture · NAND storage side by side under the main card */
+  .side-col{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:stretch;min-width:0}
+  @media(max-width:1100px){.side-col{grid-template-columns:1fr 1fr}.side-col>.card:last-child{grid-column:1/-1}}
+  @media(max-width:700px){.side-col{grid-template-columns:1fr}}
+
+  .jc-head{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap}
+  .grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .grp.actions{margin-left:auto;padding-left:14px;border-left:1px solid var(--line)}
+  .grp.actions .btn{padding:12px 20px;font-size:17px}
+  .head-rec{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--rec);margin-right:4px}
+  @media(max-width:1100px){.grp.actions{margin-left:0;padding-left:0;border-left:0;width:100%}
+    .grp.actions .btn{flex:1 1 0}}
+  .badge{font-family:var(--mono);font-weight:700;font-size:18px;width:42px;height:42px;border-radius:10px;
+    display:grid;place-items:center;background:var(--acc);color:#fff;flex:0 0 auto}
+  .jc-title{display:flex;flex-direction:column;margin-right:auto;min-width:0}
+  .jc-title b{font-size:20px}
+  .jc-title span{font-size:15px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .status-pill{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;padding:8px 15px;
+    border-radius:999px;border:1px solid var(--line);background:var(--soft);color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--muted2);transition:.3s;flex:0 0 auto}
+  .status-pill.on{color:var(--ok);border-color:#9fdcc3;background:#ecfdf5}
+  .status-pill.on .dot{background:var(--ok);box-shadow:0 0 10px 1px var(--ok)}
+  .status-pill.busy{color:var(--warn);border-color:#f3d48a;background:#fffbeb}
+  .status-pill.busy .dot{background:var(--warn);box-shadow:0 0 10px 1px var(--warn)}
+  .status-pill.err{color:var(--err);border-color:#f1b5b5;background:#fef2f2}
+  .status-pill.err .dot{background:var(--err)}
+  .field{display:flex;gap:10px;align-items:center}
+  .field input,.field select,select.inp{font-family:var(--mono);font-size:15.5px;background:#fff;border:1px solid var(--line2);
+    color:var(--ink);border-radius:10px;padding:9px 11px}
+  .field input.name{width:100px}
+
+  .card{border:1px solid var(--line);border-radius:var(--r);background:#fff;box-shadow:var(--shadow);overflow:hidden}
+  .card .hd{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .card .hd h2{font-size:15px;margin:0;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+  .card .hd .sp{margin-left:auto}
+  .card .bd{padding:16px}
+  .eyebrow{font-size:14px;letter-spacing:1.2px;text-transform:uppercase;color:var(--acc);font-weight:700}
+  .hint{font-size:14.5px;color:var(--muted2);line-height:1.5}
+  .banner{display:none;border-radius:var(--r2);padding:13px 16px;font-size:16px;line-height:1.45;border:1px solid}
+  .banner.show{display:block}
+  .banner.warn{background:#fffbeb;border-color:#f3d48a;color:#8a5300}
+  .banner.err{background:#fef2f2;border-color:#f1b5b5;color:#b91c1c}
+  .banner.info{background:#f1f6fb;border-color:var(--line);color:var(--muted)}
+
+  /* ---------- joint picker ---------- */
+  .picker .joints{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:720px){.picker .joints{grid-template-columns:1fr 1fr}}
+  .card .hd h2.settings-t{color:var(--acc);font-size:17px;letter-spacing:1.6px}
+  .card.picker.needs{border:2px solid var(--acc);animation:needs 1.8s ease-in-out infinite}
+  .card.picker.needs .hd{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+  @keyframes needs{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 55%,transparent)}
+    50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--acc) 0%,transparent),0 0 26px 2px color-mix(in srgb,var(--acc) 35%,transparent)}}
+  @media(prefers-reduced-motion:reduce){.card.picker.needs{animation:none;box-shadow:0 0 22px 2px color-mix(in srgb,var(--acc) 35%,transparent)}}
+  .jcard{border:1px solid var(--line);border-radius:var(--r2);background:var(--soft);padding:15px 16px;cursor:pointer;
+    text-align:left;color:var(--ink);font-family:var(--ui);transition:.15s}
+  .jcard:hover{border-color:var(--line2)}
+  .jcard.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset;background:color-mix(in srgb,var(--acc) 8%,#fff)}
+  .jcard{display:flex;align-items:center;gap:14px}
+  .jcard b{display:block;font-size:19px}
+  .jcard svg{width:58px;height:58px;flex:0 0 auto;color:var(--muted)}
+  .jcard.sel svg,.jcard:hover:not(:disabled) svg{color:var(--acc)}
+  .jcard:disabled{opacity:.4;cursor:not-allowed}
+  .opts{display:grid;grid-template-columns:auto 1fr;gap:12px 16px;align-items:center;margin-top:16px;font-size:16px}
+  .opts label.k{color:var(--muted)}
+  .seg{justify-self:start;display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .seg button{font-family:var(--ui);font-size:16px;font-weight:600;background:var(--soft);color:var(--muted);border:0;padding:9px 18px;cursor:pointer}
+  .seg button.on{background:var(--acc);color:#fff}
+  details.adv{margin-top:14px;border:1px solid var(--line);border-radius:var(--r2);background:var(--soft)}
+  details.adv summary{cursor:pointer;padding:12px 15px;font-size:15.5px;color:var(--muted);font-weight:600}
+  details.adv .in{padding:4px 15px 15px}
+  .mvlist{margin:12px 0 0;padding:0;list-style:none;font-size:15.5px;color:var(--muted);line-height:1.65}
+  .mvlist li b{color:var(--ink);font-weight:600}
+  .mvlist.dof{margin:0;padding:12px 16px 14px;border-top:1px solid var(--line);background:var(--soft)}
+  .mvlist .ang-legend{display:flex;flex-wrap:wrap;gap:6px 26px;margin-top:4px}
+  .mvlist .ang-legend>span{display:inline-flex;align-items:center;gap:8px}
+  .chk{display:inline-flex;align-items:center;gap:7px;font-size:15.5px;color:var(--muted);margin-right:14px;cursor:pointer}
+  .chk input{width:17px;height:17px}
+
+  /* ---------- monitor ---------- */
+  .gonio-wrap{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+  /* dial follows the screen height so angles + buttons fit on one screen (iPad, laptop) */
+  canvas.dial{width:clamp(220px,min(calc(100vh - 370px),44vw),420px);height:auto;aspect-ratio:1;max-width:100%;flex:0 0 auto;margin:0 auto}
+  .readouts{display:grid;grid-template-columns:1fr;gap:10px;flex:1 1 260px;min-width:250px}
+  .ro{border:1px solid var(--line);border-radius:var(--r2);padding:10px 15px;background:var(--soft);cursor:pointer;transition:.15s}
+  .ro:hover{border-color:var(--line2)}
+  .ro.focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset;background:#fff}
+  .ro .k{font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ro .row{display:flex;align-items:baseline;gap:12px;margin-top:4px;flex-wrap:wrap}
+  .ro .v{font-family:var(--mono);font-size:36px;font-weight:600;font-variant-numeric:tabular-nums}
+  .ro .u{font-size:17px;color:var(--muted2);font-weight:500}
+  .ro .mm{margin-left:auto;font-family:var(--mono);font-size:15px;color:var(--muted);text-align:right;line-height:1.4}
+  .ro .dir{font-size:16px;color:var(--muted);font-family:var(--ui)}
+  .ro .qa{font-size:13px;color:var(--warn);text-transform:none;letter-spacing:0}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;flex:0 0 auto}
+  .mini{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-height:820px){.ro .v{font-size:30px}.ro{padding:7px 14px}.ro .mm{font-size:14px}}
+  /* tablet portrait / narrow windows: keep dial and the three angles side by side */
+  @media(max-width:900px){
+    canvas.dial{width:clamp(220px,min(calc(100vh - 370px),40vw),420px)}
+    .ro .v{font-size:30px}.ro .dir,.ro .qa{display:none}.ro .mm{font-size:13.5px}.ro{padding:7px 12px}
+    .card .hd [data-r="focusLabel"],.card .hd .rate{display:none}
+    .vtabs{margin-left:auto}
+  }
+  .mini .ro{cursor:default}
+  .mini .ro .v{font-size:22px}
+  /* angles / plot view tabs inside the monitor card */
+  .vtabs{display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-left:6px}
+  .vtabs button{font-family:var(--ui);font-size:16px;font-weight:600;background:var(--soft);color:var(--muted);border:0;padding:9px 20px;cursor:pointer}
+  .vtabs button+button{border-left:1px solid var(--line)}
+  .vtabs button:hover{color:var(--ink)}
+  .vtabs button.on{background:var(--acc);color:#fff}
+  .plot-wrap{padding:16px 18px 8px}
+  canvas.chart{width:100%;height:clamp(240px,calc(100vh - 430px),520px);display:block}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;padding:6px 18px 18px}
+  .legend .lg{display:inline-flex;align-items:baseline;gap:10px;font-family:var(--ui);font-size:16px;color:var(--muted);cursor:pointer;
+    border:1px solid var(--line);border-radius:var(--r2);background:var(--soft);padding:10px 15px;transition:.15s}
+  .legend .lg:hover{border-color:var(--line2)}
+  .legend .lg.focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset;color:var(--ink)}
+  .legend .lg .swatch{align-self:center}
+  .legend .lg b{font-family:var(--mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+
+  .cmd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cmd-grid .full{grid-column:1/-1}
+  .grouplabel{font-size:13.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:14px 2px 8px;font-weight:600}
+  .grouplabel:first-child{margin-top:0}
+
+  .stat-row{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1 1 100px;border:1px solid var(--line);border-radius:var(--r2);padding:10px 13px;background:var(--soft)}
+  .stat .k{font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+  .rec-bar{display:flex;align-items:center;gap:12px;margin-top:12px}
+  .rec-led{width:13px;height:13px;border-radius:50%;background:#cbd5e1;flex:0 0 auto}
+  .rec-led.live,.tab.recording .rec-led{background:var(--rec);animation:pulse 1.1s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #e11d4866}50%{box-shadow:0 0 0 6px #e11d4800}}
+  @media(prefers-reduced-motion:reduce){.rec-led.live,.tab.recording .rec-led{animation:none}}
+  .switch{display:inline-flex;align-items:center;gap:9px;font-size:15px;color:var(--muted);cursor:pointer;user-select:none}
+  .switch input{appearance:none;width:40px;height:22px;border-radius:999px;background:#cbd5e1;position:relative;cursor:pointer;transition:.2s;outline:none}
+  .switch input:checked{background:var(--acc-d)}
+  .switch input::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+  .switch input:checked::after{left:20px}
+
+  .log{font-family:var(--mono);font-size:14.5px;line-height:1.55;height:220px;overflow:auto;
+    padding:12px 16px;background:var(--soft);white-space:pre-wrap;color:#334155}
+  .log .tx{color:var(--acc-d)} .log .rx{color:#047857} .log .e{color:var(--err)} .log .sys{color:var(--muted)}
+  .sess-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13.5px}
+  .sess-table th{color:var(--muted2);text-align:left;font-weight:500;padding-bottom:4px}
+  .sess-table td{border-top:1px solid var(--line);padding:4px 6px 4px 0}
+  .sess-wrap{overflow-x:auto}
+
+  /* ---------- USB download page ---------- */
+  .usbpage,.tab[data-id="USB"]{--acc:#334155;--acc-d:#1e293b}
+  .tab[data-id="USB"] .badge svg{display:block}
+  .tab{min-width:0}
+  .tab .tt span{max-width:170px}
+  @media(max-width:1100px){
+    header.top{gap:10px}
+    .globalbar .gv{display:none}.globalbar .gb{text-transform:capitalize}
+    .globalbar{gap:7px}.globalbar .btn{padding:9px 11px}
+    .tab{padding-right:12px;gap:10px}.tab .tt span{max-width:130px}
+  }
+  .usb-steps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 22px;color:var(--muted);font-size:15.5px}
+  .usb-steps li{display:flex;align-items:center;gap:8px}
+  .usb-steps li b{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;font-size:13px;flex:0 0 auto}
+  .usb-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.usb-grid{grid-template-columns:1fr}}
+  .usb-folder{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted)}
+  .usb-folder span{font-family:var(--mono);font-size:16px;color:var(--ink);margin-right:auto;word-break:break-all}
+  .usb-folder.unset span{color:var(--muted2);font-family:var(--ui)}
+  .usb-progress{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:15px;color:var(--muted)}
+  .usb-bar{flex:1;height:12px;border-radius:999px;background:#e6ecf2;overflow:hidden}
+  .usb-bar div{height:100%;width:0;background:linear-gradient(90deg,#0891b2,#7c3aed);transition:width .15s}
+  .usb-table-wrap{overflow-x:auto}
+  .usb-table{width:100%;border-collapse:collapse;font-size:15.5px}
+  .usb-table th{text-align:left;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .usb-table td{padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .usb-table td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .usb-table tbody tr:hover{background:var(--soft)}
+  .usb-table input[type=checkbox]{width:18px;height:18px;cursor:pointer}
+  .usb-empty{text-align:center;padding:26px!important}
+  .st{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:14.5px}
+  .st::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
+  .st.new{color:#0e7490}.st.saved,.st.ok{color:var(--ok)}.st.busy{color:var(--warn)}.st.err{color:var(--err)}.st.empty{color:var(--muted2)}
+  .st.warn{color:var(--warn)}
+  .usb-erase{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .usb-erase p{flex:1 1 300px}
+  .hidden{display:none!important}
+  footer{margin-top:22px;font-size:14.5px;color:var(--muted2);text-align:center;line-height:1.65}
+  kbd{font-family:var(--mono);font-size:13px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 20 L4 6"/><path d="M4 20 L19 13"/><path d="M4 11 a8 8 0 0 1 8 -5" opacity=".8"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Joint Lab Console <span style="color:var(--muted);font-weight:500">v3</span></h1>
+        <p>nRF5340 · dual LSM6DSV per PCB · up to 2 PCBs · quaternion-based joint angles (JCS)</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="PCB consoles"></nav>
+    <div class="globalbar" title="Send the same command to every connected PCB">
+      
+      <button id="allStart" class="btn sm go" disabled title="Start recording on both PCBs">▶ <span class="gv">Start </span><span class="gb">both</span></button>
+      <button id="allStop" class="btn sm halt" disabled title="Stop recording on both PCBs">■ <span class="gv">Stop </span><span class="gb">both</span></button>
+      <button id="allMark" class="btn sm mark" disabled title="Writes a marker on both NAND sessions at the same instant: use it to align the two recordings offline">⚑ <span class="gv">Mark </span><span class="gb">both</span></button>
+    </div>
+  </header>
+
+  <div id="gBanner" class="banner" style="margin-top:8px"></div>
+  <div class="consoles" id="consoles"></div>
+
+  <!-- ======================= USB download page (Web Serial) ======================= -->
+  <section class="jc usbpage hidden" id="usbPage" data-id="USB">
+    <div class="jc-head">
+      <div class="badge" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/></svg></div>
+      <div class="jc-title"><b>USB download</b><span id="usbSub">Copy the sessions saved on a PCB to this computer</span></div>
+      <div class="status-pill" id="usbPill"><span class="dot"></span><span id="usbStatus">Not connected</span></div>
+      <div class="grp">
+        <button class="btn primary" id="usbConnect">Connect USB</button>
+        <button class="btn ghost" id="usbDisconnect" disabled>Disconnect</button>
+        <button class="btn ghost sm" id="usbDemo" title="Simulated PCB, no hardware needed">Demo</button>
+      </div>
+    </div>
+
+    <div class="banner" id="usbBanner"></div>
+
+    <ol class="usb-steps">
+      <li><b>1</b> Plug the PCB into this computer with the USB cable</li>
+      <li><b>2</b> Press <i>Connect USB</i> and choose the PCB</li>
+      <li><b>3</b> Choose the folder where sessions are saved</li>
+      <li><b>4</b> Press <i>Download</i></li>
+    </ol>
+
+    <div class="usb-grid">
+      <div class="card">
+        <div class="hd"><h2>PCB memory</h2><span class="sp hint" id="usbFw"></span></div>
+        <div class="bd">
+          <div class="stat-row">
+            <div class="stat"><div class="k">Sessions</div><div class="v" id="usbNSess">—</div></div>
+            <div class="stat"><div class="k">Time left</div><div class="v" id="usbFree">—</div></div>
+            <div class="stat"><div class="k">State</div><div class="v" id="usbState" style="font-size:17px">—</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>Save to</h2></div>
+        <div class="bd">
+          <div class="usb-folder">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>
+            <span id="usbFolder">No folder chosen</span>
+            <button class="btn" id="usbPickDir">Choose folder…</button>
+          </div>
+          <p class="hint" id="usbFolderHint" style="margin:10px 0 0">For each session two files are written: <b>.csv</b> (opens in Excel) and <b>.bin</b> (raw data, integrity-checked).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><h2>Sessions on the PCB</h2>
+        <span class="sp hint" id="usbSelInfo"></span>
+        <button class="btn sm" id="usbRefresh" disabled>Refresh</button>
+        <button class="btn primary" id="usbDownload" disabled>⇩ Download</button></div>
+      <div class="usb-progress hidden" id="usbProgWrap">
+        <div class="usb-bar"><div id="usbBar"></div></div><span id="usbProgTxt"></span>
+      </div>
+      <div class="usb-table-wrap">
+        <table class="usb-table">
+          <thead><tr><th><input type="checkbox" id="usbAll" title="Select all" /></th><th>#</th><th>Recorded</th><th>Duration</th><th>Label</th><th>Samples</th><th>Closed by</th><th>On this computer</th></tr></thead>
+          <tbody id="usbRows"><tr><td colspan="8" class="hint usb-empty">Connect a PCB to see its sessions.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><h2>Free the PCB memory</h2></div>
+      <div class="bd usb-erase">
+        <p class="hint" id="usbEraseHint">Available once every session has been saved on this computer and checked.</p>
+        <button class="btn ghost danger" id="usbErase" disabled>Erase PCB memory</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><h2>USB log</h2></div>
+      <div class="log" id="usbLog" aria-live="polite" style="height:150px"></div>
+    </div>
+  </section>
+
+  <footer>
+    One PCB per page: switch with the tabs above or the keys <kbd>1</kbd> / <kbd>2</kbd> (<kbd>3</kbd> = USB download). A PCB keeps streaming and recording while its page is hidden.<br>
+    Measurements stay on this device: they travel from the PCB over Bluetooth/USB straight to this app and are never sent over the internet. Downloaded sessions go to the <b>Downloads</b> folder.<br>
+    Joint Lab Console · version <span id="appVersion" style="font-family:var(--mono)">dev</span>
+  </footer>
+</div>
+
+<!-- ======================= per-PCB console template ======================= -->
+<template id="tplConsole">
+  <section class="jc">
+    <div class="jc-head">
+      <div class="badge" data-r="badge">A</div>
+      <div class="jc-title"><b data-r="title">PCB A</b><span data-r="subtitle">Not connected</span></div>
+      <div class="field" title="Filter on the advertised name (default build: 'IMU')">
+        <span class="hint">Name</span><input class="name" data-r="namePrefix" value="IMU" spellcheck="false" />
+      </div>
+      <div class="status-pill" data-r="pill"><span class="dot"></span><span data-r="statusText">Disconnected</span></div>
+      <div class="grp">
+        <button class="btn primary" data-r="connectBtn">Connect</button>
+        <button class="btn ghost" data-r="disconnectBtn" disabled>Disconnect</button>
+        <button class="btn ghost sm" data-r="demoBtn" title="Synthetic data, no hardware needed">Demo</button>
+      </div>
+      <div class="grp actions">
+        <span class="head-rec hidden" data-r="headRec"><span class="rec-led live"></span><span data-r="headRecT">REC</span></span>
+        <button class="btn cal cmd" data-cmd="calibrate" disabled title="Hold the calibration posture still until it completes">⟲ Calibrate</button>
+        <button class="btn go cmd" data-cmd="start" disabled>▶ Start</button>
+        <button class="btn halt cmd" data-cmd="stop" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <div class="banner" data-r="banner"></div>
+
+    <div class="jc-layout">
+    <div class="main-col">
+    <!-- step 2: joint selection -->
+    <div class="card picker" data-r="picker">
+      <div class="hd"><h2 class="settings-t">Settings</h2></div>
+      <div class="bd">
+        <div class="joints" data-r="joints"></div>
+        <div class="opts">
+          <label class="k">Side</label>
+          <div class="seg" data-r="sideSeg"><button data-side="R" class="on">Right</button><button data-side="L">Left</button></div>
+          <label class="k">Calibration posture</label>
+          <select class="inp" data-r="postureSel"></select>
+        </div>
+        <p class="hint" data-r="placement" style="margin:10px 0 0"></p>
+        <details class="adv" open>
+          <summary>Sensor axis mapping </summary>
+          <div class="in">
+            <div class="opts" style="margin-top:6px">
+              <label class="k">Flexion axis (medio-lateral)</label>
+              <select class="inp" data-r="mapFlex"><option>X</option><option>Y</option><option>Z</option></select>
+              <label class="k">Long axis of proximal segment</label>
+              <select class="inp" data-r="mapLong"><option>X</option><option>Y</option><option>Z</option></select>
+              <label class="k">Invert sign</label>
+              <div data-r="invBox"></div>
+            </div>
+          </div>
+        </details>
+        <div style="display:flex;gap:12px;margin-top:16px;justify-content:flex-end">
+          <button class="btn ghost" data-r="pickCancel">Cancel</button>
+          <button class="btn primary" data-r="pickConfirm" disabled>Monitor this joint →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- step 3: monitor -->
+    <div data-r="monitor" class="hidden" style="display:flex;flex-direction:column;gap:18px">
+      <div class="card">
+        <div class="hd"><h2 data-r="jointHd">Joint angles</h2>
+          <div class="vtabs" role="tablist" data-r="vtabs">
+            <button data-view="angles" class="on" role="tab">Angles</button><button data-view="plot" role="tab">Plot</button>
+          </div>
+          <span class="sp hint rate"><b data-r="vRate">0</b> Hz · steps <b data-r="vSteps">— / —</b></span>
+          <span class="eyebrow" data-r="focusLabel"></span>
+          <button class="btn ghost sm" data-r="changeJoint">Change joint</button></div>
+        <!-- view 1: three angles + dial -->
+        <div class="bd gonio-wrap" data-r="viewAngles">
+          <canvas class="dial" data-r="dial" width="800" height="800" role="img" aria-label="Live joint angle dial"></canvas>
+          <div style="display:flex;flex-direction:column;gap:8px;flex:1 1 260px;min-width:250px">
+            <div class="readouts" data-r="readouts"></div>
+          </div>
+        </div>
+        <!-- view 2: angles over time -->
+        <div class="hidden" data-r="viewPlot">
+          <div class="plot-wrap"><canvas class="chart" data-r="chart" role="img" aria-label="Joint angles over the last 20 seconds"></canvas></div>
+          <div class="legend" data-r="legend"></div>
+        </div>
+        <ul class="mvlist dof" data-r="mvList"></ul>
+      </div>
+    </div>
+
+    </div><!-- /main-col -->
+
+    <aside class="side-col">
+      <div class="card">
+        <div class="hd"><h2>Commands</h2><span class="sp hint"></span></div>
+        <div class="bd">
+          <div class="grouplabel">Calibration</div>
+          <div class="cmd-grid">
+            <button class="btn cmd" data-cmd="cal_status" disabled>Cal status</button>
+            <button class="btn cmd" data-cmd="cal_reset" disabled>Reset calibration</button>
+          </div>
+          <div class="grouplabel">System</div>
+          <div class="cmd-grid">
+            <button class="btn cmd" data-cmd="status" disabled>Status</button>
+            <button class="btn cmd" data-cmd="steps" disabled>Read steps</button>
+            <button class="btn cmd" data-cmd="reset" disabled>Reset stats</button>
+            <button class="btn cmd" data-cmd="recover" disabled>Recover</button>
+          </div>
+          <div class="grouplabel">Stream</div>
+          <div class="cmd-grid">
+            <button class="btn cmd" data-cmd="raw on" disabled>Raw IMU on</button>
+            <button class="btn cmd" data-cmd="raw off" disabled>Raw IMU off</button>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <input data-r="customCmd" placeholder="custom command…" spellcheck="false" style="flex:1;width:auto" disabled />
+            <button class="btn" data-r="sendCustom" disabled>Send</button>
+          </div>
+        </div>
+      </div>
+
+        <div class="card">
+          <div class="hd"><h2>Session capture</h2>
+            <label class="sp switch" title="Write to a file on disk as data arrives (Chrome only)"><input type="checkbox" data-r="liveSave"/> live save</label></div>
+          <div class="bd">
+            <div class="stat-row">
+              <div class="stat"><div class="k">Captured</div><div class="v" data-r="capCount">0</div></div>
+              <div class="stat"><div class="k">Duration</div><div class="v"><span data-r="capDur">0.0</span>s</div></div>
+            </div>
+            <div class="rec-bar"><span class="rec-led" data-r="recLed"></span><span class="hint" data-r="recState">Idle — press Start to begin a capture.</span></div>
+            <div class="cmd-grid" style="margin-top:10px">
+              <button class="btn" data-r="downloadBtn" disabled>Download .json</button>
+              <button class="btn ghost danger" data-r="clearBtn">Clear capture</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd"><h2>NAND storage</h2><span class="sp hint" data-r="nandState">—</span></div>
+          <div class="bd">
+            <div class="stat-row">
+              <div class="stat"><div class="k">Sessions</div><div class="v" data-r="nandSess">—</div></div>
+              <div class="stat"><div class="k">Time left</div><div class="v" style="font-size:19px" data-r="nandFree">—</div></div>
+              <div class="stat"><div class="k">Dropped</div><div class="v" data-r="nandDrop">—</div></div>
+            </div>
+            <div class="cmd-grid" style="margin-top:10px">
+              <button class="btn cmd" data-cmd="nand" disabled>Refresh</button>
+              <button class="btn cmd" data-cmd="sessions" disabled>List sessions</button>
+            </div>
+            <div class="field" style="margin-top:9px">
+              <input data-r="sessLabel" placeholder="next session label (default: joint_side)…" spellcheck="false" maxlength="23" style="flex:1;width:auto" disabled />
+              <button class="btn" data-r="sendLabel" disabled>Set</button>
+            </div>
+            <div class="cmd-grid" style="margin-top:8px">
+              <button class="btn" data-r="markBtn" disabled title="Mark the current instant inside the session">⚑ Marker</button>
+              <button class="btn ghost danger" data-r="eraseBtn" disabled>Erase NAND</button>
+            </div>
+            <div class="hint sess-wrap" data-r="sessTable" style="margin-top:12px">Press <b>List sessions</b>.</div>
+          </div>
+        </div>
+    </aside>
+    </div><!-- /jc-layout -->
+
+    <div class="card">
+      <div class="hd"><h2>Console log</h2></div>
+      <div class="log" data-r="log" aria-live="polite"></div>
+    </div>
+  </section>
+</template>
+
+<script>
+"use strict";
+/* ====================== Nordic UART Service ====================== */
+const NUS_SVC = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const NUS_RX  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // write  (host → device)
+const NUS_TX  = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // notify (device → host)
+const enc = new TextEncoder();
+
+const CHART_WIN_MS = 20000;
+const SERIES_COL = ["#0891b2","#d97706","#c026d3"];
+const CLOSE_REASON = ["stop","USB","max duration","inactivity","storage full","error","recovered"];
+const MODE_NAME = ["auto start","BLE only","BLE + autostart","idle"];
+const DEG = Math.PI/180;
+const Q_SCALE = 32767;   /* ROM_Q_SCALE in session_format.h */
+const FLAGS_ANGLES_VALID = 0x03;   /* ROM_FLAG_Q0_VALID | ROM_FLAG_Q1_VALID */
+
+/* ====================== joint definitions ======================
+ * Anatomical frame of each joint (built from the PCB axes, see mapping):
+ *   axis 0 = medio-lateral (flexion axis of the proximal segment)
+ *   axis 2 = long axis of the proximal segment
+ *   axis 1 = axis2 × axis0 (antero-posterior)
+ * The relative rotation is split with an intrinsic Cardan sequence equivalent
+ * to the ISB Joint Coordinate System (Grood & Suntay):
+ *   1st about the proximal ML axis, 2nd about the floating axis, 3rd about
+ *   the distal segment's own axis.
+ *   Knee / elbow / wrist: ML → AP(floating) → long axis      seq [0,1,2]
+ *   Ankle (ISB):          ML → vertical(floating) → foot AP  seq [0,2,1]
+ * Each angle: clinical name, positive / negative direction, normative range
+ * (AAOS, indicative, in clinical sign: [neg limit, pos limit]) and dial range.
+ */
+const JOINTS = {
+  knee:{ name:"Knee", prox:"thigh", dist:"shank", seq:[0,1,2], map:{flex:"X",long:"Y"},
+    dof:"Flexion/extension + small varus/valgus and tibial axial rotation",
+    placement:"Proximal IMU on the lateral/anterior distal thigh, distal IMU on the antero-medial tibia (flat bone, little soft tissue). Keep both away from the quadriceps belly to limit soft-tissue artefact.",
+    postures:[{label:"Standing, knee fully extended",off:0},{label:"Seated, knee at 90°",off:90}],
+    calMove:"keep the knee locked and move the whole leg: lift it forward, then out to the side (hip flexion / abduction)",
+    angles:[
+      {name:"Flexion / Extension",short:"Flex/Ext",pos:"flexion",neg:"extension",ref:[-10,135],dial:[-30,160]},
+      {name:"Varus / Valgus",short:"Var/Val",pos:"varus",neg:"valgus",ref:null,dial:[-30,30],note:"small, sensitive to cross-talk"},
+      {name:"Internal / External rotation",short:"Int/Ext rot",pos:"internal",neg:"external",ref:null,dial:[-50,50]},
+    ]},
+  ankle:{ name:"Ankle", prox:"shank", dist:"foot", seq:[0,2,1], map:{flex:"X",long:"Z"},
+    dof:"Ankle complex (talocrural + subtalar): dorsi/plantarflexion, inversion/eversion, foot ab/adduction",
+    placement:"Proximal IMU on the distal anterior tibia, distal IMU on the dorsum of the foot (mid-foot, over the metatarsals). Default mapping assumes the foot IMU lies flat on the dorsum.",
+    postures:[{label:"Standing, shank vertical, foot flat (anatomical 90° = 0°)",off:0}],
+    calMove:"keep the ankle locked and move the whole leg: seated, lift the foot off the floor, raise and lower the leg, tilt it to the side",
+    angles:[
+      {name:"Dorsiflexion / Plantarflexion",short:"DF/PF",pos:"dorsiflexion",neg:"plantarflexion",ref:[-50,20],dial:[-70,40]},
+      {name:"Adduction / Abduction (int/ext rot)",short:"Add/Abd",pos:"adduction",neg:"abduction",ref:null,dial:[-40,40]},
+      {name:"Inversion / Eversion",short:"Inv/Ev",pos:"inversion",neg:"eversion",ref:[-15,35],dial:[-40,50]},
+    ]},
+  elbow:{ name:"Elbow", prox:"upper arm", dist:"forearm", seq:[0,1,2], map:{flex:"X",long:"Y"},
+    dof:"Flexion/extension (humero-ulnar) + pronation/supination (radio-ulnar); carrying angle as quality check",
+    placement:"Proximal IMU on the distal upper arm, distal IMU on the DISTAL forearm (dorsal, just above the wrist): the radius rotates there, near the elbow pronation/supination is almost invisible.",
+    postures:[{label:"Elbow at 90°, forearm neutral (thumb up) — clinical zero",off:90},{label:"Elbow fully extended, thumb up",off:0}],
+    calMove:"keep elbow angle AND forearm rotation locked and move the whole arm: raise it forward, then out to the side (shoulder flexion / abduction)",
+    angles:[
+      {name:"Flexion / Extension",short:"Flex/Ext",pos:"flexion",neg:"extension",ref:[0,150],dial:[-20,170]},
+      {name:"Varus / Valgus (carrying angle)",short:"Var/Val",pos:"varus",neg:"valgus",ref:null,dial:[-30,30],note:"should stay small"},
+      {name:"Pronation / Supination",short:"Pro/Sup",pos:"pronation",neg:"supination",ref:[-80,80],dial:[-110,110]},
+    ]},
+  wrist:{ name:"Wrist", prox:"forearm", dist:"hand", seq:[0,1,2], map:{flex:"X",long:"Y"},
+    dof:"Flexion/extension + radial/ulnar deviation. Pronation/supination is a forearm movement: measure it with the elbow pair",
+    placement:"Proximal IMU on the dorsal distal forearm, distal IMU on the dorsum of the hand over the 3rd metacarpal. Both rotate together in pronation/supination, so the axial angle should stay near 0.",
+    postures:[{label:"Forearm and hand aligned, palm down",off:0}],
+    calMove:"keep the wrist straight and locked and move the whole forearm: raise and lower it, tilt it to the sides",
+    angles:[
+      {name:"Flexion / Extension",short:"Flex/Ext",pos:"flexion",neg:"extension",ref:[-70,80],dial:[-100,100]},
+      {name:"Radial / Ulnar deviation",short:"Rad/Uln",pos:"radial",neg:"ulnar",ref:[-30,20],dial:[-50,50]},
+      {name:"Axial rotation (residual)",short:"Axial",pos:"",neg:"",ref:null,dial:[-30,30],note:"quality check — should stay ≈ 0"},
+    ]},
+};
+
+/* Line drawings of each joint (side view): segments + joint centre. */
+const ICO=(body,cx,cy)=>`<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}`+
+  `<circle cx="${cx}" cy="${cy}" r="4.6" fill="currentColor" stroke="#ffffff" stroke-width="2"/></svg>`;
+const JOINT_ICON={
+  knee:  ICO(`<path d="M15 3 L23 23"/><path d="M23 23 L15 40"/><path d="M15 40 L26 42"/>`,23,23),
+  ankle: ICO(`<path d="M19 3 V31"/><path d="M15 41 L19 31 L27 34 L41 38 Q43 41 40 41 Z" stroke-width="2.8"/>`,19,31),
+  elbow: ICO(`<path d="M4 34 H25"/><path d="M25 34 L36 12"/><circle cx="37.5" cy="8.5" r="3.6"/>`,25,34),
+  wrist: ICO(`<path d="M3 32 H24"/><path d="M24 32 L34 22"/><path d="M34 22 L41 13"/><path d="M34 22 L43 18"/><path d="M33 23 L38 28"/>`,24,32),
+};
+
+/* ====================== quaternion / rotation math ====================== */
+/* Firmware Euler: roll(X), pitch(Y), yaw(Z) of q = qz(yaw)·qy(pitch)·qx(roll). */
+function eulerZYXToQuat(rDeg,pDeg,yDeg){
+  const r=rDeg*DEG/2,p=pDeg*DEG/2,y=yDeg*DEG/2;
+  const cr=Math.cos(r),sr=Math.sin(r),cp=Math.cos(p),sp=Math.sin(p),cy=Math.cos(y),sy=Math.sin(y);
+  return [cr*cp*cy+sr*sp*sy, sr*cp*cy-cr*sp*sy, cr*sp*cy+sr*cp*sy, cr*cp*sy-sr*sp*cy];
+}
+function quatToEulerZYX(q){
+  const [w,x,y,z]=q;
+  const r=Math.atan2(2*(w*x+y*z),1-2*(x*x+y*y));
+  const s=2*(w*y-z*x); const p=Math.abs(s)>=1?Math.sign(s)*Math.PI/2:Math.asin(s);
+  const yy=Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z));
+  return [r/DEG,p/DEG,yy/DEG];
+}
+function quatToMat(q){
+  let [w,x,y,z]=q; const n=Math.hypot(w,x,y,z)||1; w/=n;x/=n;y/=n;z/=n;
+  return [[1-2*(y*y+z*z),2*(x*y-w*z),2*(x*z+w*y)],
+          [2*(x*y+w*z),1-2*(x*x+z*z),2*(y*z-w*x)],
+          [2*(x*z-w*y),2*(y*z+w*x),1-2*(x*x+y*y)]];
+}
+function matToQuat(m){
+  const t=m[0][0]+m[1][1]+m[2][2]; let w,x,y,z;
+  if(t>0){const s=Math.sqrt(t+1)*2; w=.25*s; x=(m[2][1]-m[1][2])/s; y=(m[0][2]-m[2][0])/s; z=(m[1][0]-m[0][1])/s;}
+  else if(m[0][0]>m[1][1]&&m[0][0]>m[2][2]){const s=Math.sqrt(1+m[0][0]-m[1][1]-m[2][2])*2; w=(m[2][1]-m[1][2])/s; x=.25*s; y=(m[0][1]+m[1][0])/s; z=(m[0][2]+m[2][0])/s;}
+  else if(m[1][1]>m[2][2]){const s=Math.sqrt(1+m[1][1]-m[0][0]-m[2][2])*2; w=(m[0][2]-m[2][0])/s; x=(m[0][1]+m[1][0])/s; y=.25*s; z=(m[1][2]+m[2][1])/s;}
+  else {const s=Math.sqrt(1+m[2][2]-m[0][0]-m[1][1])*2; w=(m[1][0]-m[0][1])/s; x=(m[0][2]+m[2][0])/s; y=(m[1][2]+m[2][1])/s; z=.25*s;}
+  return w<0?[-w,-x,-y,-z]:[w,x,y,z];
+}
+const matMul=(A,B)=>A.map((r,i)=>[0,1,2].map(j=>r[0]*B[0][j]+r[1]*B[1][j]+r[2]*B[2][j]));
+const matT=(A)=>[0,1,2].map(i=>[0,1,2].map(j=>A[j][i]));
+function axisRot(i,a){ const c=Math.cos(a),s=Math.sin(a);
+  if(i===0) return [[1,0,0],[0,c,-s],[0,s,c]];
+  if(i===1) return [[c,0,s],[0,1,0],[-s,0,c]];
+  return [[c,-s,0],[s,c,0],[0,0,1]]; }
+/* Intrinsic Cardan decomposition R = R_i(a)·R_j(b)·R_k(c), i,j,k distinct. */
+function cardan(R,[i,j,k]){
+  const s=((j-i+3)%3===1)?1:-1;
+  const b=Math.asin(Math.max(-1,Math.min(1,s*R[i][k])));
+  const a=Math.atan2(-s*R[j][k],R[k][k]);
+  const c=Math.atan2(-s*R[i][j],R[i][i]);
+  return [a/DEG,b/DEG,c/DEG];
+}
+function composeCardan([a,b,c],[i,j,k]){ return matMul(matMul(axisRot(i,a*DEG),axisRot(j,b*DEG)),axisRot(k,c*DEG)); }
+/* Columns = anatomical axes (ML, AP, long) expressed in PCB coordinates. */
+function mappingMatrix(flex,long){
+  const e={X:[1,0,0],Y:[0,1,0],Z:[0,0,1]};
+  const a0=e[flex], a2=e[long];
+  const a1=[a2[1]*a0[2]-a2[2]*a0[1], a2[2]*a0[0]-a2[0]*a0[2], a2[0]*a0[1]-a2[1]*a0[0]];
+  return [0,1,2].map(r=>[a0[r],a1[r],a2[r]]);
+}
+
+/* ====================== helpers ====================== */
+const fmt=(x)=>(x===null||x===undefined||Number.isNaN(x))?"—":(x>=0?"+":"")+x.toFixed(1);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function fmtDuration(sec){ if(!Number.isFinite(sec))return "—";
+  if(sec<90)return sec.toFixed(0)+" s"; if(sec<5400)return (sec/60).toFixed(1)+" min"; return (sec/3600).toFixed(1)+" h"; }
+function stamp(){ const d=new Date(),p=(n)=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
+function loadPrefs(key){ try{ return JSON.parse(localStorage.getItem(key)||"null"); }catch{ return null; } }
+function savePrefs(key,v){ try{ localStorage.setItem(key,JSON.stringify(v)); }catch{} }
+const monoFont=()=>getComputedStyle(document.body).getPropertyValue("--mono");
+
+/* ====================== one console per PCB ====================== */
+class JointConsole{
+  constructor(id){
+    this.id=id;
+    const frag=document.getElementById("tplConsole").content.cloneNode(true);
+    this.root=frag.querySelector(".jc"); this.root.dataset.id=id;
+    this.r={}; this.root.querySelectorAll("[data-r]").forEach(el=>this.r[el.dataset.r]=el);
+    this.r.badge.textContent=id; this.r.title.textContent="PCB "+id;
+    document.getElementById("consoles").appendChild(frag);
+    /* tab: one console per page */
+    const tab=document.createElement("button");
+    tab.className="tab"; tab.dataset.id=id; tab.setAttribute("role","tab");
+    tab.innerHTML=`<span class="badge">${id}</span><span class="tt"><b>PCB ${id}</b><span data-t="sub">Not connected</span></span>`+
+      `<span class="rec-led" title="Recording"></span><span class="dot" title="Connection"></span>`;
+    tab.onclick=()=>selectConsole(id);
+    document.getElementById("tabs").appendChild(tab);
+    this.tab=tab;
+    this.dec=new TextDecoder();
+    this.S={ device:null, rx:null, tx:null, connected:false, demo:false, demoTimer:null, rxBuf:"",
+      joint:null, side:"R", postureIdx:0, map:null, inv:[false,false,false],
+      cfgDraft:null, last:[null,null,null], min:[null,null,null], max:[null,null,null],
+      focus:0, arrivals:[], chart:[], t0:null, srcQuat:false,
+      capturing:false, session:null, fileWriter:null, sessList:[],
+      lastI:null, lastT:null, pendingMk:0, manualLabel:false,
+      calPoll:null, calKey:null, calInfo:null, calLogNext:false };
+    this.buildPicker(); this.wire(); this.setControls(false); this.showPicker(false);
+    this.r.vtabs.querySelectorAll("button").forEach(b=>b.onclick=()=>this.setView(b.dataset.view));
+    this.setView(loadPrefs("jlc3.view")==="plot"?"plot":"angles");
+    this.updateTab();
+  }
+
+  /* ---------- tab ---------- */
+  get active(){ return !this.root.classList.contains("hidden"); }
+  updateTab(){
+    if(!this.tab) return;
+    const t=this.tab, cls=this.r.pill.className.replace("status-pill","").trim();
+    t.classList.toggle("on",cls==="on"); t.classList.toggle("busy",cls==="busy"); t.classList.toggle("err",cls==="err");
+    const recNow=!!(this.S.capturing||this.r.recLed.classList.contains("live"));
+    t.classList.toggle("recording",recNow); this.r.headRec.classList.toggle("hidden",!recNow);
+    if(recNow&&!this.S.capturing) this.r.headRecT.textContent="REC";
+    const j=this.S.joint?JOINTS[this.S.joint]:null;
+    const parts=[];
+    if(j) parts.push(`${j.name} ${this.S.side==="R"?"R":"L"}`);
+    parts.push(this.r.statusText.textContent);
+    t.querySelector('[data-t="sub"]').textContent=parts.join(" · ");
+    t.setAttribute("aria-selected",this.active?"true":"false");
+  }
+
+  /* ---------- UI helpers ---------- */
+  log(msg,cls){ const el=this.r.log, line=document.createElement("div"); if(cls)line.className=cls;
+    line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`; el.appendChild(line); el.scrollTop=el.scrollHeight;
+    while(el.childNodes.length>400) el.removeChild(el.firstChild); }
+  setStatus(t,cls){ this.r.statusText.textContent=t; this.r.pill.className="status-pill"+(cls?" "+cls:""); this.updateTab(); }
+  banner(msg,kind){ const b=this.r.banner; if(!msg){b.className="banner";return;} b.textContent=msg; b.className="banner show "+(kind||"warn");
+    /* message on a hidden page: flag its tab so it is not missed */
+    if(this.tab&&!this.active&&(kind==="err"||kind==="warn"||!kind)){ this.tab.classList.add("alert"); this.tab.classList.toggle("alert-err",kind==="err"); } }
+  get live(){ return this.S.connected||this.S.demo; }
+  setControls(on){
+    this.root.querySelectorAll(".cmd").forEach(b=>b.disabled=!on);
+    ["customCmd","sendCustom","sessLabel","sendLabel","markBtn","eraseBtn"].forEach(k=>this.r[k].disabled=!on);
+    this.r.disconnectBtn.disabled=!on; this.r.connectBtn.disabled=on;
+    this.r.demoBtn.disabled=this.S.connected; this.r.demoBtn.textContent=this.S.demo?"Stop demo":"Demo";
+    updateGlobal();
+  }
+
+  /* ---------- joint picker ---------- */
+  buildPicker(){
+    const box=this.r.joints; box.innerHTML="";
+    for(const [key,j] of Object.entries(JOINTS)){
+      const b=document.createElement("button"); b.className="jcard"; b.dataset.joint=key;
+      b.innerHTML=JOINT_ICON[key]+`<b>${j.name}</b>`; b.title=`${j.prox} → ${j.dist}`;
+      b.onclick=()=>this.pickJoint(key); box.appendChild(b);
+    }
+    this.r.sideSeg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+      this.S.cfgDraft&&(this.S.cfgDraft.side=b.dataset.side);
+      this.r.sideSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); });
+    this.r.mapFlex.onchange=this.r.mapLong.onchange=()=>this.validateMap();
+  }
+  showPicker(enabled){
+    this.r.picker.classList.remove("hidden"); this.r.monitor.classList.add("hidden");
+    this.r.joints.querySelectorAll(".jcard").forEach(b=>b.disabled=!enabled);
+    this.r.picker.classList.toggle("needs",!!enabled);   // highlight: settings to fill in
+    this.r.pickCancel.classList.toggle("hidden",!this.S.joint);
+    if(!enabled){ this.r.pickConfirm.disabled=true; }
+    const cur=this.S.joint;
+    this.S.cfgDraft={joint:cur,side:this.S.side,postureIdx:this.S.postureIdx};
+    this.r.sideSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.side===this.S.side));
+    if(cur&&enabled) this.pickJoint(cur,true); else { this.r.placement.textContent="";
+      this.r.postureSel.innerHTML=""; this.r.joints.querySelectorAll(".jcard").forEach(b=>b.classList.remove("sel")); }
+  }
+  pickJoint(key,keepPosture){
+    const j=JOINTS[key]; const d=this.S.cfgDraft; d.joint=key;
+    this.r.joints.querySelectorAll(".jcard").forEach(b=>b.classList.toggle("sel",b.dataset.joint===key));
+    this.r.postureSel.innerHTML=j.postures.map((p,i)=>`<option value="${i}">${p.label}</option>`).join("");
+    this.r.postureSel.value=(keepPosture&&key===this.S.joint)?this.S.postureIdx:0;
+    this.r.placement.innerHTML="<b>Placement:</b> "+j.placement;
+    const pref=loadPrefs("jlc2.map."+key)||{flex:j.map.flex,long:j.map.long,inv:[false,false,false]};
+    this.r.mapFlex.value=pref.flex; this.r.mapLong.value=pref.long;
+    this.r.invBox.innerHTML=j.angles.map((a,i)=>`<label class="chk"><input type="checkbox" data-inv="${i}" ${pref.inv[i]?"checked":""}/> ${a.short}</label>`).join("");
+    this.validateMap();
+  }
+  validateMap(){
+    const ok=this.r.mapFlex.value!==this.r.mapLong.value;
+    this.r.pickConfirm.disabled=!ok||!this.S.cfgDraft||!this.S.cfgDraft.joint||!this.live;
+    if(!ok) this.banner("Flexion axis and long axis must be different.","warn"); else if(this.r.banner.textContent.startsWith("Flexion axis")) this.banner("");
+  }
+  confirmJoint(){
+    const d=this.S.cfgDraft, j=JOINTS[d.joint];
+    const map={flex:this.r.mapFlex.value,long:this.r.mapLong.value,
+      inv:[0,1,2].map(i=>!!this.r.invBox.querySelector(`[data-inv="${i}"]`).checked)};
+    savePrefs("jlc2.map."+d.joint,map);
+    const changed=d.joint!==this.S.joint;
+    Object.assign(this.S,{joint:d.joint,side:d.side,postureIdx:+this.r.postureSel.value,map,inv:map.inv,
+      M:mappingMatrix(map.flex,map.long)});
+    if(changed){ this.S.chart=[]; this.S.t0=null; this.S.focus=0; }
+    this.resetMinMax();
+    this.buildMonitor();
+    this.r.picker.classList.add("hidden"); this.r.monitor.classList.remove("hidden");
+    this.r.subtitle.textContent=`${j.name} · ${this.S.side==="R"?"right":"left"} · ${this.S.device?this.S.device.name:(this.S.demo?"DEMO":"")}`;
+    this.log(`Joint set: ${j.name} (${this.S.side==="R"?"right":"left"}), posture "${j.postures[this.S.postureIdx].label}", mapping ML=${map.flex} long=${map.long}`,"sys");
+    if(this.S.demo) this.startDemoStream();
+    this.updateTab();
+  }
+  buildMonitor(){
+    const j=JOINTS[this.S.joint];
+    this.r.mvList.innerHTML=`<li><b>Degrees of freedom:</b> ${j.dof}</li>`+
+      `<li class="ang-legend">`+j.angles.map((a,i)=>
+      `<span><span class="swatch" style="background:${SERIES_COL[i]}"></span><b>${a.name}</b>`+
+      (a.note?` <i>(${a.note})</i>`:"")+`</span>`).join("")+`</li>`;
+    this.r.jointHd.textContent=`${j.name} angles · ${this.S.side==="R"?"right":"left"}`;
+    this.r.readouts.innerHTML=j.angles.map((a,i)=>`
+      <div class="ro" data-i="${i}">
+        <div class="k"><span class="swatch" style="background:${SERIES_COL[i]}"></span>${a.name}${a.note?` <span class="qa">· ${a.note}</span>`:""}</div>
+        <div class="row"><span class="v" style="color:${SERIES_COL[i]}" data-v="${i}">—</span><span class="u">°</span>
+          <span class="dir" data-dir="${i}"></span>
+          <span class="mm">min <span data-min="${i}">—</span> · max <span data-max="${i}">—</span><br>ROM <span data-rom="${i}">—</span>°</span></div>
+      </div>`).join("");
+    this.r.readouts.querySelectorAll(".ro").forEach(el=>el.onclick=()=>{ this.S.focus=+el.dataset.i; this.markFocus(); });
+    this.r.legend.innerHTML=j.angles.map((a,i)=>`<button class="lg" data-i="${i}"><span class="swatch" style="background:${SERIES_COL[i]}"></span>${a.short}`+
+      `<b style="color:${SERIES_COL[i]}" data-lv="${i}">—</b>°</button>`).join("");
+    this.r.legend.querySelectorAll(".lg").forEach(el=>el.onclick=()=>{ this.S.focus=+el.dataset.i; this.markFocus(); });
+    this.markFocus();
+  }
+  markFocus(){ const j=JOINTS[this.S.joint]; if(!j)return;
+    this.r.readouts.querySelectorAll(".ro").forEach(el=>el.classList.toggle("focus",+el.dataset.i===this.S.focus));
+    this.r.legend.querySelectorAll(".lg").forEach(el=>el.classList.toggle("focus",+el.dataset.i===this.S.focus));
+    this.r.focusLabel.textContent=(this.S.view==="plot"?"highlighted · ":"dial · ")+j.angles[this.S.focus].short; }
+  setView(v){
+    this.S.view=v; savePrefs("jlc3.view",v);
+    this.r.vtabs.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
+    this.r.viewAngles.classList.toggle("hidden",v!=="angles"); this.r.viewPlot.classList.toggle("hidden",v!=="plot");
+    if(this.S.joint) this.markFocus();
+  }
+  resetMinMax(){ this.S.min=[null,null,null]; this.S.max=[null,null,null]; }
+
+  /* ---------- connection ---------- */
+  async connect(){
+    if(!navigator.bluetooth){ this.banner("This browser has no Web Bluetooth. Use Google Chrome.","err"); return; }
+    try{
+      this.setStatus("Requesting device…","busy");
+      const prefix=this.r.namePrefix.value.trim();
+      const filters=[{services:[NUS_SVC]}]; if(prefix) filters.push({namePrefix:prefix});
+      const dev=await navigator.bluetooth.requestDevice({filters,optionalServices:[NUS_SVC]});
+      const other=CONSOLES.find(c=>c!==this&&c.S.device&&c.S.device.id===dev.id&&c.S.connected);
+      if(other){ this.setStatus("Disconnected"); this.banner(`This PCB is already connected in console ${other.id}. Pick the other one.`,"warn"); return; }
+      this.S.device=dev; dev.addEventListener("gattserverdisconnected",()=>this.onDisconnected());
+      this.setStatus("Connecting…","busy");
+      const server=await dev.gatt.connect();
+      const svc=await server.getPrimaryService(NUS_SVC);
+      this.S.rx=await svc.getCharacteristic(NUS_RX);
+      this.S.tx=await svc.getCharacteristic(NUS_TX);
+      await this.S.tx.startNotifications();
+      this.S.tx.addEventListener("characteristicvaluechanged",(ev)=>this.onNotify(ev));
+      this.S.connected=true; this.S.rxBuf="";
+      this.setStatus("Connected","on"); this.setControls(true); this.banner("");
+      this.r.subtitle.textContent=dev.name||"device";
+      this.log("Connected to "+(dev.name||"device"),"sys");
+      /* No RTC on the board: pass the PC time so NAND sessions carry an absolute date. */
+      await this.send("time "+Date.now());
+      /* The board may already be recording (autostart, or left running after a Disconnect). */
+      await this.send("status"); await this.send("nand");
+      this.showPicker(true);
+      if(this.S.joint) this.banner("Same joint as before? Confirm it below, or pick another one.","info");
+    }catch(e){
+      if(e&&e.name==="NotFoundError"){ this.setStatus("Disconnected"); this.log("Device selection cancelled.","sys"); }
+      else { this.setStatus("Error","err"); this.banner("Connection failed: "+(e.message||e),"err"); this.log("Connect error: "+(e.message||e),"e"); }
+    }
+  }
+  onDisconnected(){
+    if(!this.S.connected) return;
+    this.S.connected=false; this.S.rx=this.S.tx=null; this.stopCalPoll();
+    this.setStatus("Disconnected"); this.setControls(false);
+    if(this.S.capturing) this.stopCapture();
+    this.r.subtitle.textContent=(this.S.joint?JOINTS[this.S.joint].name+" · ":"")+"not connected";
+    this.log("Device disconnected.","sys");
+  }
+  async disconnect(){
+    if(this.S.demo){ this.stopDemo(); return; }
+    if(this.S.device&&this.S.device.gatt&&this.S.device.gatt.connected) this.S.device.gatt.disconnect();
+    else this.onDisconnected();
+  }
+
+  /* ---------- commands (identical to the single-PCB console) ---------- */
+  async send(cmd,opt){
+    const quiet=opt&&opt.quiet;
+    if(cmd==="calibrate") this.startCalPoll();
+    if(cmd==="cal_status"&&!quiet) this.S.calLogNext=true;
+    /* No label typed by the operator: name the NAND session after the joint,
+       so the file downloaded via USB says which joint it contains. */
+    if(cmd==="start"&&!this.S.manualLabel&&this.S.joint) await this.send("label "+this.autoLabel());
+    if(cmd==="mark"||cmd.startsWith("mark ")) this.noteMarker(parseInt(cmd.slice(5))||1);
+    if(!quiet) this.log("» "+cmd,"tx");
+    if(cmd==="start") this.startCapture();
+    if(cmd==="stop")  this.stopCapture();
+    if(cmd==="calibrate"){ this.resetMinMax(); }
+    /* start/stop change the DEVICE state: re-read it shortly after instead of guessing. */
+    if(cmd==="start"||cmd==="stop"){
+      const after=(cmd==="stop")?2000:800;
+      setTimeout(()=>{ if(this.live){ this.send("status"); if(cmd==="stop") this.send("nand"); } },after);
+    }
+    if(this.S.demo){ this.demoHandleCommand(cmd); return; }
+    if(!this.S.rx){ this.banner("Not connected.","warn"); return; }
+    try{
+      const data=enc.encode(cmd+"\n");
+      if(this.S.rx.writeValueWithoutResponse) await this.S.rx.writeValueWithoutResponse(data);
+      else await this.S.rx.writeValue(data);
+    }catch(e){ this.log("write error: "+(e.message||e),"e"); }
+  }
+
+  /* ---------- guided two-phase calibration ---------- */
+  startCalPoll(){
+    this.stopCalPoll(); this.S.calKey=null; this._calT0=Date.now();
+    const j=JOINTS[this.S.joint];
+    this.banner("Calibration starting — "+(j?`hold the ${j.name.toLowerCase()} in the calibration posture: `+j.postures[this.S.postureIdx].label:"hold still")+".","info");
+    this.S.calPoll=setInterval(()=>{
+      if(!this.live||Date.now()-this._calT0>30000){ this.stopCalPoll(); return; }
+      this.send("cal_status",{quiet:true});
+    },400);
+  }
+  stopCalPoll(){ if(this.S.calPoll){ clearInterval(this.S.calPoll); this.S.calPoll=null; } }
+  onCal(m){
+    const key=m.state+"/"+(m.ph??"");
+    if(key!==this.S.calKey||this.S.calLogNext){
+      this.log("‹ calibration: "+m.state+" "+(m.pct??"")+"%"+(m.ph!==undefined?" phase="+(m.ph+1)+"/2":"")+" valid="+m.valid+
+        (m.hsrc!==undefined?` heading src=${m.hsrc} offset=${(+m.hd).toFixed(1)}° rms=${(+m.hrms).toFixed(1)}° contrast=${(+m.hc).toFixed(3)}`:""),"rx");
+      this.S.calLogNext=false;
+    }
+    this.S.calKey=key;
+    const j=JOINTS[this.S.joint];
+    if(m.state==="IN_PROGRESS"){
+      if(m.ph===1) this.banner(`Phase 2/2 (${m.pct}%) — ${j?j.calMove:"keep the joint locked and move the whole limb"}. Move slowly but widely (≥ 45°).`,"warn");
+      else this.banner(`Phase 1/2 (${m.pct??0}%) — hold the calibration posture completely still.`,"info");
+      return;
+    }
+    if(m.state==="DONE"||m.state==="FAILED") this.stopCalPoll();
+    if(m.state==="DONE"){
+      this.resetMinMax();
+      this.S.calInfo={at:new Date().toISOString(),valid:m.valid,heading_src:m.hsrc??null,heading_offset_deg:m.hd??null,
+        heading_residual_deg:m.hrms??null,heading_contrast:m.hc??null};
+      if(m.hsrc===undefined) this.banner("Calibrated. This firmware has no heading alignment: angles will change when the whole limb moves (update the firmware, see INTEGRATION.md).","warn");
+      else if(+m.hsrc===2) { this.banner(`Calibrated · heading aligned (dynamic): offset ${(+m.hd).toFixed(1)}°, residual ${(+m.hrms).toFixed(1)}°.`,"info");
+        this.log(`Heading aligned (dynamic): offset ${(+m.hd).toFixed(1)}°, residual ${(+m.hrms).toFixed(1)}°`,"sys"); }
+      else if(+m.hsrc===1) this.banner("Calibrated, but the limb was not moved enough in phase 2: heading estimated from posture only (less accurate). Repeat Calibrate and move the whole limb more.","warn");
+      else this.banner("Calibrated WITHOUT heading correction: angles will change when the whole limb moves. Repeat Calibrate and move the limb in phase 2.","err");
+    }else if(m.state==="FAILED"){
+      const why={"-11":"the limb moved during phase 1 (hold still)","-116":"timeout (no data from the sensors?)"}[String(m.err)]||("error "+(m.err??"?"));
+      this.banner("Calibration failed: "+why+". Press Calibrate again.","err");
+    }
+  }
+  autoLabel(){ return `${this.S.joint}_${this.S.side}`; }
+  /* Marker in the .json: listed in session.markers and flagged ("mk") on the
+     next sample, mirroring what the firmware does on the NAND record. */
+  noteMarker(code){
+    if(!this.S.capturing||!this.S.session){ this.log("Marker "+code+": no capture running in the console (NAND only).","sys"); return; }
+    this.S.session.markers.push({code,h:Date.now(),after_i:this.S.lastI,after_t:this.S.lastT,
+      sample_index_in_file:this.S.session.samples.length});
+    this.S.pendingMk=code;
+    this.log("Marker "+code+" written to the capture.","sys");
+  }
+
+  /* ---------- incoming data ---------- */
+  onNotify(ev){ this.S.rxBuf+=this.dec.decode(ev.target.value,{stream:true});
+    let nl; while((nl=this.S.rxBuf.indexOf("\n"))>=0){ const line=this.S.rxBuf.slice(0,nl).trim();
+      this.S.rxBuf=this.S.rxBuf.slice(nl+1); if(line) this.handleLine(line); } }
+  handleLine(line){
+    const san=line.replace(/:\s*NaN\b/g,":0").replace(/:\s*-?Infinity\b/g,":0");
+    let m; try{ m=JSON.parse(san); }catch(e){ this.log("‹ "+line+" (parse error)","rx"); return; }
+    switch(m.ty){
+      case "rom": this.onRom(m); break;
+      case "raw": if(this.S.capturing&&this.S.session) this.S.session.raw.push(m); break;
+      case "status": this.onStatus(m); break;
+      case "cal": this.onCal(m); break;
+      case "steps": this.r.vSteps.textContent=`${m.imu0} / ${m.imu1}`; this.log("‹ steps: "+m.imu0+" / "+m.imu1,"rx"); break;
+      case "nand": this.onNand(m); break;
+      case "sess": this.S.sessList.push(m); break;
+      case "sess_end": this.renderSessions(m.n); break;
+      case "ack": this.log("‹ "+m.cmd+": "+(m.ok?"ok":"fail")+(m.msg?(" — "+m.msg):""),"rx"); break;
+      case "err": this.log("‹ error: "+m.msg,"e"); break;
+      default: this.log("‹ "+line,"rx");
+    }
+  }
+
+  /* Relative orientation → clinical joint angles. */
+  computeAngles(m){
+    let q;
+    /* v2 firmware: "q" = the same int16 quaternion written to the NAND record
+       (x ROM_Q_SCALE = 32767), decoded exactly like rom_download.py. */
+    if(Array.isArray(m.q)&&m.q.length===4){ q=m.q.map(v=>v/Q_SCALE); this.S.srcQuat="quaternion-int16 (same as NAND)"; }
+    else if(m.qw!==undefined){ q=[+m.qw,+m.qx,+m.qy,+m.qz]; this.S.srcQuat="quaternion"; }
+    else { q=eulerZYXToQuat(+m.r||0,+m.p||0,+m.y||0); this.S.srcQuat=false; }
+    const M=this.S.M, j=JOINTS[this.S.joint];
+    const Ra=matMul(matMul(matT(M),quatToMat(q)),M);           // rotation in anatomical axes
+    const raw=cardan(Ra,j.seq);
+    const sideSign=this.S.side==="L"?-1:1;                     // mirror the out-of-plane angles
+    const a=raw.map((v,i)=>v*(this.S.inv[i]?-1:1)*(i>0?sideSign:1));
+    /* Calibration not done in the clinical zero: the first rotation of the sequence
+       is about the proximal ML axis, so a known flexion at calibration adds exactly. */
+    a[0]+=j.postures[this.S.postureIdx].off;
+    return {a,q};
+  }
+  onRom(m){
+    const now=performance.now();
+    this.S.lastI=m.i; this.S.lastT=m.t;
+    this.S.arrivals.push(now); while(this.S.arrivals.length&&now-this.S.arrivals[0]>1000) this.S.arrivals.shift();
+    this.r.vRate.textContent=this.S.arrivals.length;
+    if(!this.S.joint||!this.r.picker.classList.contains("hidden")) return;   // joint not chosen yet
+    /* Same rule as the NAND export: angles exist only if both SFLP quaternions
+       were valid. A zero written while the fusion converges is not a 0° angle. */
+    if(m.f!==undefined&&(m.f&FLAGS_ANGLES_VALID)!==FLAGS_ANGLES_VALID){
+      if(!this._invalidLogged){ this.log("Samples flagged invalid by the PCB (SFLP not converged): not shown, saved with valid=0.","sys"); this._invalidLogged=true; }
+      if(this.S.capturing&&this.S.session){
+        const rec={t:m.t,i:m.i,h:Math.round(performance.timeOrigin+now),valid:0,f:m.f};
+        if(Array.isArray(m.q)) rec.qi=m.q;
+        this.S.session.samples.push(rec); this.r.capCount.textContent=this.S.session.samples.length;
+        if(this.S.fileWriter) this.S.fileWriter.write(JSON.stringify(rec)+"\n").catch(()=>{});
+      }
+      return;
+    }
+    this._invalidLogged=false;
+    const {a,q}=this.computeAngles(m);
+    this.S.last=a;
+    const j=JOINTS[this.S.joint];
+    for(let i=0;i<3;i++){
+      if(this.S.min[i]===null||a[i]<this.S.min[i]) this.S.min[i]=a[i];
+      if(this.S.max[i]===null||a[i]>this.S.max[i]) this.S.max[i]=a[i];
+    }
+    if(!this._uiT||now-this._uiT>60){                          // ~16 Hz text refresh is plenty
+      this._uiT=now;
+      for(let i=0;i<3;i++){
+        const q1=this.r.readouts; if(!q1) break;
+        q1.querySelector(`[data-v="${i}"]`).textContent=fmt(a[i]);
+        const def=j.angles[i]; const dir=Math.abs(a[i])<0.5?"":(a[i]>0?def.pos:def.neg);
+        q1.querySelector(`[data-dir="${i}"]`).textContent=dir;
+        q1.querySelector(`[data-min="${i}"]`).textContent=fmt(this.S.min[i]);
+        q1.querySelector(`[data-max="${i}"]`).textContent=fmt(this.S.max[i]);
+        q1.querySelector(`[data-rom="${i}"]`).textContent=(this.S.max[i]-this.S.min[i]).toFixed(1);
+        const lv=this.r.legend.querySelector(`[data-lv="${i}"]`); if(lv) lv.textContent=fmt(a[i]);
+      }
+    }
+    if(this.S.t0===null) this.S.t0=now; const tt=now-this.S.t0;
+    this.S.chart.push({t:tt,a:a.slice()});
+    while(this.S.chart.length&&tt-this.S.chart[0].t>CHART_WIN_MS) this.S.chart.shift();
+    if(this.S.capturing&&this.S.session){
+      /* h = host time (ms, Unix): the two PCBs have independent clocks, this is the
+         common time base to align the two files offline (BLE jitter ≈ tens of ms). */
+      const rec={t:m.t,i:m.i,h:Math.round(performance.timeOrigin+now),
+        a1:+a[0].toFixed(3),a2:+a[1].toFixed(3),a3:+a[2].toFixed(3),
+        q:q.map(v=>+v.toFixed(6)),p:m.p,r:m.r,y:m.y};
+      if(Array.isArray(m.q)) rec.qi=m.q;          // raw int16 as on the NAND record
+      if(m.f!==undefined){ rec.f=m.f; rec.valid=1; }
+      if(this.S.pendingMk){ rec.mk=this.S.pendingMk; this.S.pendingMk=0; }
+      this.S.session.samples.push(rec);
+      this.r.capCount.textContent=this.S.session.samples.length;
+      if(this.S.fileWriter) this.S.fileWriter.write(JSON.stringify(rec)+"\n").catch(()=>{});
+    }
+  }
+
+  /* ---------- device status / NAND ---------- */
+  onStatus(m){
+    this.log("‹ status: state="+m.state+" rec="+m.rec+" acq="+m.acq+" proc="+m.proc+" spi_err="+m.spi_err+
+      " fifo_ov="+m.fifo_ov+" fus_err="+m.fus_err+" t_it="+m.t_it+"us t_sflp="+m.t_sflp+"us t_ble="+m.t_ble+"us tx_drop="+m.tx_drop,"rx");
+    const rec=(m.state==="RECORDING"), saving=(m.sess===1);
+    const mode=(m.mode!==undefined&&MODE_NAME[m.mode])?MODE_NAME[m.mode]:"?";
+    this.r.recLed.classList.toggle("live",rec||this.S.capturing); this.updateTab();
+    if(rec){
+      this.r.recState.textContent=saving?"Recording on the device — saving to NAND. Press Stop to close it."
+                                        :"Recording on the device — BLE telemetry only, nothing saved.";
+      if(m.log===0) this.banner(`Mode "${mode}": data is NOT written to NAND. What you see here is all there is — use Download .json to keep it.`,"warn");
+      else if(!saving) this.banner("Recording active but no NAND session open: check the storage state.","err");
+      else this.banner("");
+    }else if(m.state==="READY"){
+      this.r.recState.textContent="Device ready — press Start to begin the session.";
+    }
+  }
+  onNand(m){
+    const st=this.r.nandState;
+    if(m.log===0){ st.textContent="saving disabled"; st.style.color="var(--warn)"; this.log("‹ BLE-only mode: NAND is not written.","rx"); return; }
+    if(!m.ready){ st.textContent="NAND missing"; st.style.color="var(--err)"; this.log("‹ NAND not available: sessions are NOT saved.","e"); return; }
+    const pct=m.free+m.used>0?Math.round(100*m.used/(m.used+m.free)):0;
+    st.textContent=pct+"% used"; st.style.color=pct>90?"var(--err)":(pct>70?"var(--warn)":"var(--muted)");
+    this.r.nandSess.textContent=m.sess+"/"+m.max_sess; this.r.nandFree.textContent=fmtDuration(m.free_s); this.r.nandDrop.textContent=m.drop;
+    if(m.drop>0) this.log("‹ WARNING: "+m.drop+" records dropped (buffer full).","e");
+    if(m.err>0)  this.log("‹ WARNING: "+m.err+" NAND write errors.","e");
+    this.log("‹ nand: "+m.sess+" sessions, "+m.free+" free pages (~"+fmtDuration(m.free_s)+"), bad="+m.bad+", usb="+(m.usb?"connected":"no"),"rx");
+  }
+  renderSessions(total){
+    const el=this.r.sessTable;
+    if(!this.S.sessList.length){ el.textContent="No saved sessions."; this.S.sessList=[]; return; }
+    let h='<table class="sess-table"><tr><th>#</th><th>id</th><th>records</th><th>duration</th><th>start</th><th>closed by</th></tr>';
+    for(const s of this.S.sessList){
+      const when=s.t0>0?new Date(s.t0).toLocaleString():"—";
+      h+=`<tr><td>${s.idx}</td><td>${s.id}</td><td>${s.rec}</td><td>${fmtDuration(s.dur_ms/1000)}</td><td>${when}</td><td>${CLOSE_REASON[s.reason]??s.reason}${s.rcv?" ⚠":""}</td></tr>`;
+    }
+    el.innerHTML=h+`</table><p style="margin:8px 0 0">${total} sessions. Download them via USB with <span style="font-family:var(--mono)">python3 tools/rom_download.py --all -o data/</span></p>`;
+    this.S.sessList=[];
+  }
+
+  /* ---------- capture / file ---------- */
+  async startCapture(){
+    if(this.S.capturing) return;
+    const j=JOINTS[this.S.joint];
+    this.S.session={ meta:{
+        app:"Joint Lab Console v2", schema:"joint-v2", console:this.id,
+        device:this.S.device?this.S.device.name:(this.S.demo?"DEMO":"unknown"),
+        started:new Date().toISOString(), started_host_ms:Date.now(),
+        joint:this.S.joint, side:this.S.side,
+        calibration_posture:j?j.postures[this.S.postureIdx].label:null,
+        flexion_offset_deg:j?j.postures[this.S.postureIdx].off:0,
+        axis_mapping:this.S.map, cardan_sequence:j?j.seq:null,
+        angles:j?j.angles.map((a,i)=>({key:"a"+(i+1),name:a.name,positive:a.pos,negative:a.neg})):[],
+        calibration:this.S.calInfo,
+        nand_label:this.S.manualLabel?this.S.manualLabelText:(this.S.joint?this.autoLabel():null),
+        marker_codes:{"1":"Marker (this PCB)","2":"Mark both (sync between PCB A and B)"},
+        note:"a1..a3 = clinical joint angles (deg). q = relative quaternion of the PCB (w,x,y,z). p/r/y = firmware Euler. t = device µs, h = host Unix ms (common time base for 2 PCBs). mk = marker code on the first sample after the marker. qi = relative quaternion as int16 x32767, identical to the NAND record; f = quality flags (bit0|bit1 = angles valid)."},
+      markers:[], samples:[], raw:[] };
+    this.resetMinMax();
+    this.S.capturing=true; this.r.recLed.classList.add("live");
+    this.r.recState.textContent="Recording…"; this.r.downloadBtn.disabled=true; this.r.capCount.textContent="0";
+    this.r.changeJoint.disabled=true;
+    this._capStart=performance.now(); this.tickDur();
+    if(this.r.liveSave.checked) await this.openLiveFile();
+    this.log("Capture started.","sys"); this.updateTab();
+  }
+  async stopCapture(){
+    if(!this.S.capturing) return;
+    this.S.capturing=false; this.r.recLed.classList.remove("live"); this.r.changeJoint.disabled=false;
+    const s=this.S.session;
+    if(s){ s.meta.stopped=new Date().toISOString(); s.meta.sample_count=s.samples.length; s.meta.raw_count=s.raw.length;
+      s.meta.source=this.S.srcQuat||"euler-rebuilt";
+      s.meta.rom=JOINTS[this.S.joint]?[0,1,2].map(i=>({min:this.S.min[i],max:this.S.max[i]})):null; }
+    if(this.S.fileWriter){ try{ await this.S.fileWriter.write("\n=== summary ===\n"+JSON.stringify(s.meta,null,2)+"\n"); await this.S.fileWriter.close(); }catch{} this.S.fileWriter=null; }
+    this.r.recState.textContent="Stopped — "+(s?s.samples.length:0)+" samples captured.";
+    this.r.downloadBtn.disabled=!(s&&s.samples.length);
+    this.log("Capture stopped: "+(s?s.samples.length:0)+" samples.","sys"); this.updateTab();
+  }
+  tickDur(){ if(!this.S.capturing)return; const sec=(performance.now()-this._capStart)/1000; this.r.capDur.textContent=sec.toFixed(1);
+    this.r.headRecT.textContent="REC "+Math.floor(sec/60)+":"+String(Math.floor(sec%60)).padStart(2,"0");
+    requestAnimationFrame(()=>this.tickDur()); }
+  fileName(ext){ return `${this.S.joint||"joint"}${this.S.side?"_"+this.S.side:""}_${this.id}_${stamp()}.${ext}`; }
+  async openLiveFile(){
+    if(!window.showSaveFilePicker){ this.banner("Live save needs Chrome's File System Access API; capturing in memory instead.","warn"); return; }
+    try{ const h=await window.showSaveFilePicker({suggestedName:this.fileName("ndjson"),
+          types:[{description:"NDJSON",accept:{"application/x-ndjson":[".ndjson"]}}]});
+      const w=await h.createWritable(); this.S.fileWriter=w; await w.write(JSON.stringify(this.S.session.meta)+"\n");
+      this.log("Live save → file opened.","sys");
+    }catch(e){ this.log("Live save cancelled.","sys"); }
+  }
+  downloadJSON(){
+    if(!this.S.session) return;
+    const blob=new Blob([JSON.stringify(this.S.session,null,1)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=this.fileName("json");
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); this.log("Downloaded "+a.download,"sys");
+  }
+  clearCapture(){
+    this.S.session=null; this.S.chart=[]; this.S.t0=null; this.resetMinMax(); this.S.arrivals=[]; this.S.last=[null,null,null];
+    this.r.capCount.textContent="0"; this.r.capDur.textContent="0.0"; this.r.downloadBtn.disabled=true;
+    this.r.recState.textContent="Idle — press Start to begin a capture."; this.r.vRate.textContent="0";
+    this.r.readouts.querySelectorAll("[data-v],[data-min],[data-max],[data-rom]").forEach(e=>e.textContent="—");
+    this.r.readouts.querySelectorAll("[data-dir]").forEach(e=>e.textContent="");
+    this.r.legend.querySelectorAll("[data-lv]").forEach(e=>e.textContent="—");
+    this.log("Capture cleared.","sys");
+  }
+
+  /* ---------- drawing ---------- */
+  draw(){ if(!this.active||this.r.monitor.classList.contains("hidden")||!this.S.joint) return; if(this.S.view==="plot") this.drawChart(); else this.drawDial(); }
+  drawDial(){
+    const cv=this.r.dial, c=cv.getContext("2d"), W=cv.width, H=cv.height, cx=W/2, cy=H*0.47, R=W*0.34;
+    const def=JOINTS[this.S.joint].angles[this.S.focus], [lo,hi]=def.dial, col=SERIES_COL[this.S.focus];
+    const a0=Math.PI*0.75, a1=Math.PI*2.25, ang=(v)=>a0+(clamp(v,lo,hi)-lo)/(hi-lo)*(a1-a0);
+    const arc=(r,a,b)=>{c.beginPath();c.arc(cx,cy,r,a,b);c.stroke();};
+    c.clearRect(0,0,W,H); c.lineCap="round";
+    c.lineWidth=W*0.055; c.strokeStyle="#e6ecf2"; arc(R,a0,a1);
+    const span=hi-lo, step=span>200?30:(span>90?20:10);
+    c.strokeStyle="#b8c5d3"; c.lineWidth=2; c.fillStyle="#4b5f72";
+    c.font=`${Math.round(W*0.038)}px ${monoFont()}`; c.textAlign="center"; c.textBaseline="middle";
+    for(let d=Math.ceil(lo/step)*step; d<=hi; d+=step){ const a=ang(d);
+      c.beginPath(); c.moveTo(cx+Math.cos(a)*(R-W*0.04),cy+Math.sin(a)*(R-W*0.04)); c.lineTo(cx+Math.cos(a)*(R+W*0.012),cy+Math.sin(a)*(R+W*0.012)); c.stroke();
+      c.fillText((d>0?"+":"")+d,cx+Math.cos(a)*(R+W*0.085),cy+Math.sin(a)*(R+W*0.085)); }
+    const v=this.S.last[this.S.focus];
+    if(v!==null&&!Number.isNaN(v)){
+      c.lineWidth=W*0.055; c.strokeStyle=col; const az=ang(clamp(0,lo,hi)), av=ang(v); arc(R,Math.min(az,av),Math.max(az,av));
+      c.strokeStyle="#1e293b"; c.lineWidth=W*0.011; c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+Math.cos(av)*(R-W*0.02),cy+Math.sin(av)*(R-W*0.02)); c.stroke();
+    }
+    for(const mv of [this.S.min[this.S.focus],this.S.max[this.S.focus]]){ if(mv===null)continue; const a=ang(mv);
+      c.strokeStyle="#1e293b99"; c.lineWidth=3; c.beginPath(); c.moveTo(cx+Math.cos(a)*(R-W*0.035),cy+Math.sin(a)*(R-W*0.035));
+      c.lineTo(cx+Math.cos(a)*(R+W*0.02),cy+Math.sin(a)*(R+W*0.02)); c.stroke(); }
+    c.fillStyle="#1e293b"; c.beginPath(); c.arc(cx,cy,W*0.03,0,7); c.fill();
+    c.fillStyle=col; c.textBaseline="alphabetic";
+    c.font=`600 ${Math.round(W*0.12)}px ${monoFont()}`; c.fillText(v===null||Number.isNaN(v)?"--":(v>=0?"+":"")+v.toFixed(1),cx,cy+W*0.26);
+    c.fillStyle="#4b5f72"; c.font=`${Math.round(W*0.045)}px ${getComputedStyle(document.body).getPropertyValue("--ui")}`;
+    c.fillText(def.short+" · deg",cx,cy+W*0.345);
+  }
+  drawChart(){
+    const cv=this.r.chart, dpr=window.devicePixelRatio||1;
+    const W=cv.clientWidth, H=cv.clientHeight; if(!W||!H) return;
+    if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+    const c=cv.getContext("2d"); c.setTransform(dpr,0,0,dpr,0,0);
+    const padL=66, padR=14, padT=12, padB=34;
+    c.clearRect(0,0,W,H);
+    const data=this.S.chart; let lo=-20,hi=20;
+    for(const d of data) for(const v of d.a){ if(v<lo)lo=v; if(v>hi)hi=v; }
+    const spanV=Math.max(40,(hi-lo)*1.12), mid=(hi+lo)/2; lo=mid-spanV/2; hi=mid+spanV/2;
+    const tEnd=data.length?data[data.length-1].t:0, tStart=tEnd-CHART_WIN_MS;   // right edge = now
+    const X=(t)=>padL+(t-tStart)/CHART_WIN_MS*(W-padL-padR), Y=(v)=>padT+(hi-v)/(hi-lo)*(H-padT-padB);
+    c.font=`15px ${monoFont()}`; c.fillStyle="#4b5f72"; c.lineWidth=1;
+    /* horizontal grid + degree labels */
+    c.textAlign="right"; c.textBaseline="middle"; c.strokeStyle="#e6ecf2";
+    for(let g=0;g<=5;g++){ const v=hi-(hi-lo)*g/5, yy=Math.round(Y(v))+.5; c.beginPath(); c.moveTo(padL,yy); c.lineTo(W-padR,yy); c.stroke(); c.fillText((v>=0?"+":"")+v.toFixed(0)+"°",padL-10,yy); }
+    if(lo<0&&hi>0){ c.strokeStyle="#94a3b8"; c.lineWidth=1.5; c.beginPath(); c.moveTo(padL,Y(0)); c.lineTo(W-padR,Y(0)); c.stroke(); c.lineWidth=1; }
+    /* time axis: seconds before now */
+    c.textAlign="center"; c.textBaseline="top"; c.strokeStyle="#eef2f6";
+    for(let s=0;s<=CHART_WIN_MS/1000;s+=5){ const xx=Math.round(padL+(1-s*1000/CHART_WIN_MS)*(W-padL-padR))+.5;
+      c.beginPath(); c.moveTo(xx,padT); c.lineTo(xx,H-padB); c.stroke(); c.fillText(s===0?"now":`−${s} s`,xx,H-padB+9); }
+    if(data.length<2) return;
+    c.lineJoin="round"; c.lineCap="round";
+    const order=[0,1,2].filter(k=>k!==this.S.focus).concat(this.S.focus);   // focused series on top
+    for(const k of order){ c.strokeStyle=SERIES_COL[k]; c.lineWidth=k===this.S.focus?3:1.8; c.globalAlpha=k===this.S.focus?1:.6;
+      c.beginPath(); data.forEach((d,i)=>{ const x=X(d.t),y=Y(d.a[k]); i?c.lineTo(x,y):c.moveTo(x,y); }); c.stroke(); }
+    c.globalAlpha=1;
+  }
+
+  /* ---------- demo mode ---------- */
+  startDemo(){
+    if(this.S.connected){ this.banner("Disconnect the real device before using Demo mode.","warn"); return; }
+    this.S.demo=true; this.setStatus("Demo mode","busy"); this.setControls(true);
+    this.r.subtitle.textContent="DEMO"; this.banner(""); this.log("Demo mode on — choose a joint to start the synthetic stream.","sys");
+    this.showPicker(true);
+  }
+  startDemoStream(){
+    if(this.S.demoTimer) clearInterval(this.S.demoTimer);
+    const j=JOINTS[this.S.joint], M=this.S.M, off=j.postures[this.S.postureIdx].off; let i=0;
+    const sgn=(k)=>(this.S.inv[k]?-1:1)*(k>0&&this.S.side==="L"?-1:1);
+    const prof={knee:[[60,55,1500],[3,0,2300],[8,0,1700]], ankle:[[-12,28,1300],[0,8,1900],[8,14,2100]],
+                elbow:[[75,65,1400],[0,3,2500],[0,70,1100]], wrist:[[5,55,1200],[-4,14,1700],[0,2,2300]]}[this.S.joint];
+    this.S.demoTimer=setInterval(()=>{
+      const ts=performance.now();
+      /* clinical angles → raw Cardan angles → PCB-frame rotation → quaternion + firmware Euler */
+      const clin=prof.map(([c,a,p],k)=>c+a*Math.sin(ts/p+k)+(Math.random()-.5)*0.6);
+      const raw=clin.map((v,k)=>(k===0?v-off:v)*sgn(k));
+      const Ra=composeCardan(raw,j.seq), R=matMul(matMul(M,Ra),matT(M));
+      const q=matToQuat(R), e=quatToEulerZYX(q);
+      this.onRom({ty:"rom",t:Math.round(ts*1000),i:i++,p:+e[1].toFixed(3),r:+e[0].toFixed(3),y:+e[2].toFixed(3),
+        q:q.map(v=>Math.round(Math.max(-1,Math.min(1,v))*Q_SCALE)),f:3});
+    },20);
+  }
+  stopDemo(){ if(this.S.demoTimer){clearInterval(this.S.demoTimer);this.S.demoTimer=null;}
+    if(this.S.demo){ this.S.demo=false; if(this.S.capturing)this.stopCapture(); this.setStatus("Disconnected"); this.setControls(false);
+      this.r.subtitle.textContent="Not connected"; this.showPicker(false); this.log("Demo mode off.","sys"); } }
+  demoHandleCommand(cmd){
+    const H=(o)=>this.handleLine(JSON.stringify(o)), n=this.S.session?this.S.session.samples.length:0;
+    if(cmd==="status") H({ty:"status",state:this.S.capturing?"RECORDING":"READY",ble:1,rec:this.S.capturing?1:0,mode:2,log:1,sess:this.S.capturing?1:0,acq:n,proc:n,spi_err:0,fifo_ov:0,fus_err:0,t_it:900,t_sflp:120,t_ble:40,tx_drop:0});
+    else if(cmd==="calibrate"){ H({ty:"ack",cmd,ok:1,msg:"calibrating"}); this._demoCal=performance.now(); }
+    else if(cmd==="cal_status"){ const t=this._demoCal?(performance.now()-this._demoCal)/1000:99;
+      if(t<11) H({ty:"cal",state:"IN_PROGRESS",pct:Math.round(t/11*100),valid:0,ph:t<3?0:1,err:0,hsrc:0,hd:0,hrms:0,hc:0});
+      else H({ty:"cal",state:"DONE",pct:100,valid:1,ph:1,err:0,hsrc:2,hd:27.42,hrms:0.84,hc:0.312}); }
+    else if(cmd==="steps") H({ty:"steps",imu0:(Math.random()*40|0),imu1:(Math.random()*40|0)});
+    else if(cmd==="nand") H({ty:"nand",ready:1,sess:2,max_sess:64,used:1200,free:63000,free_s:40320,bad:3,logged:120000,drop:0,pages:1200,err:0,active:0,usb:0,log:1});
+    else if(cmd==="sessions"){ H({ty:"sess",idx:0,id:1,rec:36000,dur_ms:360000,t0:Date.now()-86400000,reason:0,rcv:0});
+      H({ty:"sess",idx:1,id:2,rec:12000,dur_ms:120000,t0:Date.now()-3600000,reason:1,rcv:0}); H({ty:"sess_end",n:2}); }
+    else if(cmd!=="start"&&cmd!=="stop") H({ty:"ack",cmd,ok:1,msg:"demo"});
+  }
+
+  /* ---------- wiring ---------- */
+  wire(){
+    const r=this.r;
+    r.connectBtn.onclick=()=>this.connect();
+    r.disconnectBtn.onclick=()=>this.disconnect();
+    r.demoBtn.onclick=()=>this.S.demo?this.stopDemo():this.startDemo();
+    r.pickConfirm.onclick=()=>{ this.banner(""); this.confirmJoint(); };
+    r.pickCancel.onclick=()=>{ if(this.S.joint){ this.r.picker.classList.add("hidden"); this.r.monitor.classList.remove("hidden"); this.banner(""); } };
+    r.changeJoint.onclick=()=>{ if(!this.S.capturing) this.showPicker(this.live); };
+    r.downloadBtn.onclick=()=>this.downloadJSON();
+    r.clearBtn.onclick=()=>this.clearCapture();
+    r.sendCustom.onclick=()=>{ const v=r.customCmd.value.trim(); if(v){ this.send(v); r.customCmd.value=""; } };
+    r.customCmd.addEventListener("keydown",e=>{ if(e.key==="Enter") r.sendCustom.click(); });
+    r.sendLabel.onclick=()=>{ const v=r.sessLabel.value.trim(); if(v){ this.S.manualLabel=true; this.S.manualLabelText=v; this.send("label "+v); } };
+    r.sessLabel.addEventListener("keydown",e=>{ if(e.key==="Enter") r.sendLabel.click(); });
+    r.markBtn.onclick=()=>this.send("mark 1");
+    r.eraseBtn.onclick=()=>{
+      if(!confirm(`Erase ALL sessions stored on the NAND of PCB ${this.id}?\n\nData not yet downloaded will be lost for good.`)) return;
+      this.send("erase"); setTimeout(()=>this.send("erase confirm"),300); setTimeout(()=>this.send("nand"),4000);
+    };
+    this.root.querySelectorAll(".cmd").forEach(b=>b.onclick=()=>this.send(b.dataset.cmd));
+  }
+}
+
+
+/* ====================== USB download (Web Serial) ======================
+ * Replaces `python3 tools/rom_download.py --all` for people who do not use a terminal.
+ * Same protocol (firmware src/usb_export.c) and same output files:
+ *   PING · INFO · STATUS · LIST · HEADER <i> · TIME <ms> · GET <i> bin · ERASE / ERASE CONFIRM
+ *   GET <i> bin -> "OK get" · "# key=value" header lines · "BEGIN <records> <bytes>"
+ *                  · <bytes> raw rom_record_t (16 B, little-endian) · "\r\nEND <n> <crc32> lost=<n>"
+ * Per session (identical to rom_download.py --format bin):
+ *   <base>.bin  raw records, CRC32 checked against the PCB
+ *   <base>.csv  header comments + decoded rows (same columns, rounding and gap notes)
+ * Keep in sync with include/session_format.h (ROM_FORMAT_VERSION) and rom_download.py.
+ */
+const USB_VID_NORDIC = 0x1915;
+const USB_FORMAT_VERSION = 4;
+const REC_SIZE = 16, REC_EMPTY = 0xFFFFFFFF, REC_GAP = 0xFFFFFFFE, USB_Q_SCALE = 32767.0;
+const USB_CSV_HEADER = "t_ms,n,roll_deg,pitch_deg,yaw_deg,qw,qx,qy,qz,flags,marker,valid\n";
+const USB_CLOSE = {0:"Stop",1:"USB cable",2:"max duration",3:"inactivity",4:"memory full",5:"error",6:"power loss (recovered)"};
+const byId = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* CRC-32/IEEE, same as zlib.crc32 and Zephyr crc32_ieee_update(0, ...) */
+const CRC_TABLE = (() => { const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+  return t; })();
+function crc32(bytes) { let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0; }
+
+/* Python f"{x:.Nf}" (keeps the sign of -0.0, which toFixed drops) */
+const pyFix = (v, d) => (Object.is(v, -0) ? "-" : "") + v.toFixed(d);
+
+/* rom_download.quaternion_to_euler: intrinsic ZYX, pitch clamped to ±90 (same as the firmware) */
+function quatToEulerPy(w, x, y, z) {
+  const R = 180 / Math.PI;                       // CPython math.degrees() constant
+  const roll = Math.atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y)) * R;
+  const sinp = 2.0 * (w * y - z * x);
+  const pitch = Math.abs(sinp) >= 1.0 ? (sinp < 0 ? -90.0 : 90.0) : Math.asin(sinp) * R;
+  const yaw = Math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z)) * R;
+  return [roll, pitch, yaw];
+}
+
+/* rom_download.records_to_csv: "n" is the ABSOLUTE record index, so a lost page stays visible */
+function recordsToCsv(blob) {
+  const dv = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
+  const total = Math.floor(blob.length / REC_SIZE);
+  const out = [USB_CSV_HEADER];
+  let skipped = 0, lost = 0, gapStart = null;
+  for (let n = 0; n < total; n++) {
+    const o = n * REC_SIZE, t = dv.getUint32(o, true);
+    if (t === REC_EMPTY) { skipped++; continue; }
+    if (t === REC_GAP) { if (gapStart === null) gapStart = n; lost++; continue; }
+    if (gapStart !== null) { out.push(`# gap n=${gapStart} records=${n - gapStart} (pagina illeggibile)\n`); gapStart = null; }
+    const w = dv.getInt16(o + 4, true) / USB_Q_SCALE, x = dv.getInt16(o + 6, true) / USB_Q_SCALE,
+          y = dv.getInt16(o + 8, true) / USB_Q_SCALE, z = dv.getInt16(o + 10, true) / USB_Q_SCALE;
+    const flags = dv.getUint8(o + 12), marker = dv.getUint8(o + 13);
+    const [r, p, yw] = quatToEulerPy(w, x, y, z);
+    out.push(`${t},${n},${pyFix(r, 2)},${pyFix(p, 2)},${pyFix(yw, 2)},` +
+             `${pyFix(w, 5)},${pyFix(x, 5)},${pyFix(y, 5)},${pyFix(z, 5)},` +
+             `${flags},${marker},${(flags & 0x03) === 0x03 ? 1 : 0}\n`);
+  }
+  if (gapStart !== null) out.push(`# gap n=${gapStart} records=${total - gapStart} (pagina illeggibile)\n`);
+  if (lost) out.push(`# ATTENZIONE: ${lost} record persi per pagine illeggibili\n`);
+  return { text: out.join(""), skipped, lost };
+}
+/* The .csv written next to the .bin: GET header comments first, like rom_download.py */
+function buildCsvFile(headerLines, blob) {
+  const r = recordsToCsv(blob);
+  return { text: headerLines.map((l) => l + "\n").join("") + r.text, skipped: r.skipped, lost: r.lost };
+}
+function usbMeta(lines) { const m = {};
+  for (const l of lines) { const g = /^#\s*([A-Za-z0-9_]+)=(.*)$/.exec(l); if (g) m[g[1]] = g[2]; }
+  return m; }
+function kvLines(lines) { const o = {};
+  for (const l of lines) { const i = l.indexOf("="); if (i > 0) o[l.slice(0, i)] = l.slice(i + 1); }
+  return o; }
+/* rom_download.session_basename: local date-time of the start + sanitised label */
+function usbBaseName(s, meta) {
+  let base;
+  if (s.start > 0) { const d = new Date(s.start), p = (n) => String(n).padStart(2, "0");
+    base = `rom_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
+  else base = `rom_sessione${String(s.id).padStart(4, "0")}`;
+  const label = ((meta && meta.label) || "").trim();
+  if (label) { const safe = label.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, ""); if (safe) base += "_" + safe; }
+  return base;
+}
+
+/* ---------- byte stream with line / exact-length reads ---------- */
+class UsbTimeout extends Error { constructor() { super("the PCB is not answering"); this.name = "UsbTimeout"; } }
+class ByteQueue {
+  constructor() { this.buf = new Uint8Array(1 << 16); this.s = 0; this.e = 0; this.waiter = null; this.closed = false; this.dec = new TextDecoder(); }
+  push(chunk) {
+    const need = chunk.length, live = this.e - this.s;
+    if (this.e + need > this.buf.length) {
+      if (live + need > this.buf.length) { let cap = this.buf.length; while (cap < live + need) cap *= 2;
+        const nb = new Uint8Array(cap); nb.set(this.buf.subarray(this.s, this.e)); this.buf = nb; }
+      else this.buf.copyWithin(0, this.s, this.e);
+      this.s = 0; this.e = live;
+    }
+    this.buf.set(chunk, this.e); this.e += need; this.wake();
+  }
+  close() { this.closed = true; this.wake(); }
+  wake() { const w = this.waiter; this.waiter = null; if (w) w(); }
+  discard() { this.s = this.e = 0; }
+  wait(ms) { return new Promise((res, rej) => {
+    if (this.closed) return rej(new Error("the USB connection was closed"));
+    const t = setTimeout(() => { this.waiter = null; rej(new UsbTimeout()); }, ms);
+    this.waiter = () => { clearTimeout(t); res(); }; }); }
+  async line(ms) {
+    const deadline = Date.now() + ms;
+    for (;;) {
+      const i = this.buf.subarray(this.s, this.e).indexOf(10);
+      if (i >= 0) { const txt = this.dec.decode(this.buf.subarray(this.s, this.s + i)); this.s += i + 1; return txt.replace(/\r+$/, ""); }
+      const left = deadline - Date.now(); if (left <= 0) throw new UsbTimeout();
+      await this.wait(left);
+    }
+  }
+  async exact(dest, ms, onProgress) {          // ms = max silence between chunks
+    let got = 0;
+    while (got < dest.length) {
+      const n = Math.min(this.e - this.s, dest.length - got);
+      if (n > 0) { dest.set(this.buf.subarray(this.s, this.s + n), got); this.s += n; got += n; if (onProgress) onProgress(got); continue; }
+      await this.wait(ms);
+    }
+  }
+}
+
+/* ---------- real PCB: Web Serial (USB CDC ACM, no driver needed) ---------- */
+class SerialLink {
+  constructor(port) { this.port = port; this.q = new ByteQueue(); this.closed = false; this.onClose = null; this.label = "USB"; }
+  async open() {
+    await this.port.open({ baudRate: 115200, bufferSize: 1 << 16 });
+    try { await this.port.setSignals({ dataTerminalReady: true, requestToSend: true }); } catch { }
+    this.writer = this.port.writable.getWriter();
+    this.reader = this.port.readable.getReader();
+    this.pump();
+    await sleep(200); this.q.discard();          // drop output left over from a previous command
+  }
+  async pump() {
+    try { for (;;) { const { value, done } = await this.reader.read(); if (done) break; if (value && value.length) this.q.push(value); } }
+    catch { }
+    finally { this.q.close(); if (!this.closed) { this.closed = true; if (this.onClose) this.onClose(); } }
+  }
+  async write(text) { await this.writer.write(new TextEncoder().encode(text)); }
+  async close() {
+    this.closed = true;
+    try { await this.reader.cancel(); } catch { } try { this.reader.releaseLock(); } catch { }
+    try { this.writer.releaseLock(); } catch { } try { await this.port.close(); } catch { }
+    this.q.close();
+  }
+}
+
+/* ---------- demo PCB: emits the same bytes as the firmware (for training and tests) ---------- */
+class DemoLink {
+  constructor() { this.q = new ByteQueue(); this.closed = false; this.onClose = null; this.label = "DEMO";
+    this.armed = false; this.chain = Promise.resolve(); this.sessions = DemoLink.makeSessions(); }
+  static makeSessions() {
+    let seed = 20261109; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+    const day = 86400000, now = Date.now();
+    const defs = [
+      { label: "knee_R",  n: 3000,  start: now - 2 * day + 3600000, reason: 0, flex: [55, 50, 1.6], gap: null, empty: 0 },
+      { label: "elbow_L", n: 6000,  start: now - day + 7200000,     reason: 0, flex: [70, 60, 2.3], gap: [2048, 128], empty: 0 },
+      { label: "ankle_R", n: 20000, start: now - 3600000,           reason: 3, flex: [-10, 25, 1.9], gap: null, empty: 24 },
+    ];
+    return defs.map((d, i) => {
+      const blob = new Uint8Array(d.n * REC_SIZE), dv = new DataView(blob.buffer);
+      for (let k = 0; k < d.n; k++) {
+        const o = k * REC_SIZE;
+        if (k >= d.n - d.empty) { blob.fill(0xFF, o, o + REC_SIZE); continue; }          // unwritten tail
+        if (d.gap && k >= d.gap[0] && k < d.gap[0] + d.gap[1]) {                          // unreadable page
+          dv.setUint32(o, REC_GAP, true); dv.setUint8(o + 12, 0x40); continue; }
+        const t = k * 20, a = (d.flex[0] + d.flex[1] * Math.sin(t / 1000 * d.flex[2])) * Math.PI / 180;
+        const b = (3 * Math.sin(t / 1700) + (rnd() - 0.5)) * Math.PI / 180;
+        let q = [Math.cos(a / 2) * Math.cos(b / 2), Math.sin(a / 2) * Math.cos(b / 2), Math.cos(a / 2) * Math.sin(b / 2), -Math.sin(a / 2) * Math.sin(b / 2)];
+        dv.setUint32(o, t, true);
+        q.forEach((v, j) => dv.setInt16(o + 4 + 2 * j, Math.round(Math.max(-1, Math.min(1, v)) * 32767), true));
+        dv.setUint8(o + 12, k < 40 ? 0x01 : 0x03);                                        // fusion converging at start
+        dv.setUint8(o + 13, k === 500 ? 1 : (k === 1500 ? 2 : 0));
+      }
+      return { idx: i, id: 11 + i, label: d.label, records: d.n, duration: d.n * 20, start: d.start, reason: d.reason, blob };
+    });
+  }
+  async open() { }
+  async close() { this.closed = true; this.q.close(); }
+  async write(text) { for (const raw of text.split(/\r?\n/)) { const l = raw.trim(); if (l) this.handle(l); } }
+  emit(...parts) {                     // stream like USB full speed: random chunks, ~0.5 MB/s
+    const enc = new TextEncoder(), bufs = parts.map((p) => typeof p === "string" ? enc.encode(p) : p);
+    const all = new Uint8Array(bufs.reduce((n, b) => n + b.length, 0)); let o = 0; for (const b of bufs) { all.set(b, o); o += b.length; }
+    this.chain = this.chain.then(async () => {
+      let off = 0;
+      while (off < all.length && !this.closed) { const n = Math.min(all.length - off, 300 + Math.floor(Math.random() * 6000));
+        this.q.push(all.subarray(off, off + n)); off += n; await sleep(Math.max(1, Math.round(n / 500))); }
+    });
+  }
+  headerLines(s) {
+    return [`# session_index=${s.idx}`, `# session_id=${s.id}`, `# records=${s.records}`, `# duration_ms=${s.duration}`,
+      `# start_unix_ms=${s.start}`, `# start_uptime_ms=1520`, `# close_reason=${s.reason}`, `# recovered=0`,
+      `# format_version=${USB_FORMAT_VERSION}`, `# fw_build=DEMO`, `# label=${s.label}`, `# sample_rate_hz=240`,
+      `# log_rate_hz=50`, `# log_decimation=5`, `# sflp_rate_hz=240`, `# accel_fs_g=8`, `# gyro_fs_dps=2000`,
+      `# imu1_mount_align=0`, `# cal_valid=0x03`, `# angoli in gradi, quaternione relativo adimensionale`,
+      `# flags: bit0 q0_valid, bit1 q1_valid, bit2 fifo_ovf, bit3 spi_err, bit4 cal, bit5 neutral`].map((l) => l + "\r\n").join("");
+  }
+  handle(line) {
+    const [cmd, a1, a2] = line.split(/\s+/), C = cmd.toUpperCase();
+    if (C !== "ERASE") this.armed = false;
+    const S = this.sessions;
+    if (C === "PING") this.emit("OK pong\r\n");
+    else if (C === "INFO") this.emit("OK info\r\nfw_build=DEMO\r\nformat_version=4\r\nrecord_size=16\r\nsample_rate_hz=240\r\nlog_rate_hz=50\r\n" +
+      "log_decimation=5\r\nnand=W25N01GV (demo)\r\nnand_capacity_mb=128\r\nnand_page_size=2048\r\nstorage_ready=1\r\n" +
+      `sessions=${S.length}/64\r\npages_used=${S.length * 40}\r\npages_free=63000\r\nbad_blocks=2\r\nfree_seconds=40320\r\nEND\r\n`);
+    else if (C === "STATUS") this.emit("OK status\r\nstate=2\r\nstartup_mode=1\r\nnand_logging=1\r\nsession_active=0\r\ndownload_allowed=1\r\nactive_records=0\r\nEND\r\n");
+    else if (C === "TIME") this.emit(`OK time ${a1}\r\n`);
+    else if (C === "LIST") this.emit("OK list\r\nidx,session_id,records,duration_ms,start_unix_ms,close_reason,recovered\r\n" +
+      S.map((s) => `${s.idx},${s.id},${s.records},${s.duration},${s.start},${s.reason},0\r\n`).join("") + `END ${S.length}\r\n`);
+    else if (C === "HEADER") { const s = S[+a1]; this.emit(s ? "OK header\r\n" + this.headerLines(s) + "END\r\n" : "ERR indice sessione non valido\r\n"); }
+    else if (C === "GET") {
+      const s = S[+a1];
+      if (!s) { this.emit(`OK get ${+a1} bin\r\n`, `ERR sessione ${+a1} inesistente\r\n`); return; }
+      let lost = 0; const dv = new DataView(s.blob.buffer);
+      for (let k = 0; k < s.records; k++) if (dv.getUint32(k * REC_SIZE, true) === REC_GAP) lost++;
+      this.emit(`OK get ${s.idx} bin\r\n`, this.headerLines(s), `BEGIN ${s.records} ${s.blob.length}\r\n`, s.blob,
+        `\r\nEND ${s.records} ${crc32(s.blob).toString(16).padStart(8, "0")} lost=${lost}\r\n`);
+    }
+    else if (C === "ERASE" && (a1 || "").toUpperCase() === "CONFIRM") {
+      if (!this.armed) { this.emit("ERR erase non armato: inviare prima \"ERASE\"\r\n"); return; }
+      this.armed = false; const n = S.length; this.sessions = [];
+      this.emit("OK erase in corso, puo' richiedere alcuni secondi\r\n");
+      this.chain = this.chain.then(() => sleep(1500));
+      this.emit(`END ret=0 erased=${n * 40} failed=0\r\n`);
+    }
+    else if (C === "ERASE") { this.armed = true; this.emit("OK erase armato: inviare \"ERASE CONFIRM\" entro il prossimo comando per cancellare TUTTE le sessioni\r\n"); }
+    else this.emit(`ERR comando sconosciuto: ${cmd} (HELP per l'elenco)\r\n`);
+  }
+}
+
+/* ---------- remembered save folder (File System Access handle in IndexedDB) ---------- */
+const kvStore = {
+  open() { return new Promise((res, rej) => { const r = indexedDB.open("jlc", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async get(k) { try { const d = await this.open(); return await new Promise((res) => {
+    const g = d.transaction("kv").objectStore("kv").get(k); g.onsuccess = () => res(g.result); g.onerror = () => res(undefined); }); } catch { return undefined; } },
+  async set(k, v) { try { const d = await this.open(); await new Promise((res) => {
+    const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = res; t.onerror = res; }); } catch { } },
+};
+
+/* ---------- the page ---------- */
+class UsbPage {
+  constructor() {
+    this.root = byId("usbPage"); this.link = null; this.sessions = []; this.busy = false; this.allowed = false; this.dir = null;
+    const tab = document.createElement("button");
+    tab.className = "tab"; tab.dataset.id = "USB"; tab.setAttribute("role", "tab");
+    tab.innerHTML = `<span class="badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/></svg></span>` +
+      `<span class="tt"><b>USB</b><span data-t="sub">Download</span></span><span class="dot"></span>`;
+    tab.onclick = () => selectConsole("USB");
+    byId("tabs").appendChild(tab); this.tab = tab;
+
+    byId("usbConnect").onclick = () => this.connect();
+    byId("usbDisconnect").onclick = () => this.disconnect();
+    byId("usbDemo").onclick = () => this.link && this.link.label === "DEMO" ? this.disconnect() : this.attach(new DemoLink());
+    byId("usbRefresh").onclick = () => this.refresh();
+    byId("usbDownload").onclick = () => this.download();
+    byId("usbPickDir").onclick = () => this.pickDir();
+    byId("usbErase").onclick = () => this.erase();
+    byId("usbAll").onchange = (e) => { this.sessions.forEach((s) => { if (s.records > 0) s.sel = e.target.checked; }); this.render(); };
+    if ("serial" in navigator) navigator.serial.addEventListener("disconnect", (e) => {
+      if (this.link && this.link.port === e.target) this.onLost(); });
+    else this.banner("USB download needs Google Chrome on a computer (Windows or Mac). Demo works anyway.", "warn");
+    this.restoreDir(); this.setStatus("Not connected"); this.setButtons();
+  }
+
+  /* --- UI helpers --- */
+  get active() { return !this.root.classList.contains("hidden"); }
+  log(msg, cls) { const el = byId("usbLog"), d = document.createElement("div"); if (cls) d.className = cls;
+    d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`; el.appendChild(d); el.scrollTop = el.scrollHeight;
+    while (el.childNodes.length > 400) el.removeChild(el.firstChild); }
+  banner(msg, kind) { const b = byId("usbBanner"); if (!msg) { b.className = "banner"; return; }
+    b.textContent = msg; b.className = "banner show " + (kind || "warn");
+    if (!this.active && (kind === "err" || kind === "warn")) { this.tab.classList.add("alert"); this.tab.classList.toggle("alert-err", kind === "err"); } }
+  setStatus(text, cls) { byId("usbStatus").textContent = text; byId("usbPill").className = "status-pill" + (cls ? " " + cls : "");
+    this.tab.classList.toggle("on", cls === "on"); this.tab.classList.toggle("busy", cls === "busy"); this.tab.classList.toggle("err", cls === "err");
+    const sub = this.tab.querySelector('[data-t="sub"]'); sub.textContent = this.link ? `${text}${this.link.label === "DEMO" ? " · demo" : ""}` : "Download"; }
+  setButtons() {
+    const on = !!this.link;
+    byId("usbConnect").disabled = on || this.busy || !("serial" in navigator);
+    byId("usbDisconnect").disabled = !on || this.busy;
+    byId("usbDemo").disabled = this.busy || (on && this.link.label !== "DEMO");
+    byId("usbDemo").textContent = on && this.link.label === "DEMO" ? "Stop demo" : "Demo";
+    byId("usbRefresh").disabled = !on || this.busy;
+    const nSel = this.sessions.filter((s) => s.sel && s.records > 0).length;
+    byId("usbDownload").disabled = !on || this.busy || !this.allowed || nSel === 0;
+    byId("usbDownload").textContent = nSel ? `⇩ Download ${nSel} session${nSel > 1 ? "s" : ""}` : "⇩ Download";
+    byId("usbPickDir").disabled = this.busy;
+    const ready = this.canErase();
+    byId("usbErase").disabled = !ready || this.busy;
+    byId("usbEraseHint").textContent = !on ? "Available once every session has been saved on this computer and checked."
+      : !this.sessions.length ? "The PCB memory is empty."
+      : ready && this.sessions.some((s) => s.lost) ? "All sessions are saved, but some samples could not be read from the PCB memory. Try Download again on those sessions first (a second read sometimes works), then erase."
+      : ready ? "All sessions are saved on this computer. You can now free the PCB memory for new recordings."
+      : "Save every session on this computer first.";
+  }
+  canErase() { return !!this.link && this.allowed && this.sessions.length > 0 &&
+    this.sessions.every((s) => s.records === 0 || s.status === "ok" || s.status === "saved" || s.status === "warn"); }
+
+  /* --- protocol --- */
+  async ack(cmd, ms = 10000) {
+    this.log("» " + cmd, "tx");
+    await this.link.write(cmd + "\n");
+    for (;;) { const l = await this.link.q.line(ms); if (/^(OK|ERR)\b/.test(l)) { if (l.startsWith("ERR")) this.log("‹ " + l, "e"); return l; } }
+  }
+  async block(cmd) {
+    const a = await this.ack(cmd);
+    if (!a.startsWith("OK")) throw new Error(a.replace(/^ERR\s*/, ""));
+    const lines = [];
+    for (;;) { const l = await this.link.q.line(10000); if (l.startsWith("END")) return { lines, end: l }; lines.push(l); }
+  }
+  async getBin(idx, onBytes) {
+    const a = await this.ack(`GET ${idx} bin`);
+    if (!a.startsWith("OK")) throw new Error(a.replace(/^ERR\s*/, ""));
+    const header = []; let nBytes = -1;
+    for (;;) { const l = await this.link.q.line(15000);
+      if (l.startsWith("BEGIN")) { nBytes = parseInt(l.trim().split(/\s+/)[2], 10); break; }
+      if (l.startsWith("ERR")) throw new Error(l.replace(/^ERR\s*/, ""));
+      header.push(l); }
+    if (!(nBytes >= 0)) throw new Error("unexpected answer from the PCB");
+    const blob = new Uint8Array(nBytes);
+    await this.link.q.exact(blob, 15000, onBytes);
+    let tail; do { tail = await this.link.q.line(15000); } while (!tail.startsWith("END") && !tail.startsWith("ERR"));
+    if (tail.startsWith("ERR")) throw new Error(tail.replace(/^ERR\s*/, ""));
+    const parts = tail.trim().split(/\s+/);
+    const crcDev = parts.length >= 3 && /^[0-9a-fA-F]{8}$/.test(parts[2]) ? parseInt(parts[2], 16) : null;
+    const crcHost = crc32(blob);
+    if (crcDev !== null && crcDev !== crcHost)
+      throw new Error(`integrity check failed (CRC ${crcDev.toString(16)} ≠ ${crcHost.toString(16)}): data not reliable, download it again`);
+    return { header, meta: usbMeta(header), blob, crc: crcHost, crcChecked: crcDev !== null };
+  }
+  async resync() { try { await sleep(400); this.link && this.link.q.discard(); } catch { } }
+
+  /* --- connection --- */
+  async connect() {
+    if (this.busy || this.link) return;
+    let port;
+    try { port = await navigator.serial.requestPort({ filters: [{ usbVendorId: USB_VID_NORDIC }] }); }
+    catch (e) { if (e.name === "NotFoundError") this.log("No PCB chosen.", "sys"); else this.banner("USB error: " + e.message, "err"); return; }
+    await this.attach(new SerialLink(port));
+  }
+  async attach(link) {
+    if (this.link) return;
+    this.banner(""); this.setStatus("Connecting…", "busy");
+    try { await link.open(); }
+    catch (e) {
+      this.setStatus("Not connected", "err");
+      this.banner(e.name === "InvalidStateError" ? "This PCB is already open in another Joint Lab Console window: close that one first."
+        : "Could not open the PCB's USB port. Unplug and plug the cable again; close any other program that uses the PCB, then retry.", "err");
+      this.log("open failed: " + e.message, "e"); return;
+    }
+    this.link = link; link.onClose = () => this.onLost();
+    this.log(link.label === "DEMO" ? "Demo PCB connected (simulated data)." : "USB port opened.", "sys");
+    this.busy = true; this.setButtons();
+    try {
+      const pong = await this.ack("PING", 4000);
+      if (!pong.startsWith("OK")) throw new Error("the PCB did not answer");
+      await this.ack("TIME " + Date.now()).catch(() => { });   // no RTC on the PCB: give it the PC time
+      this.setStatus("Connected", "on");
+    } catch (e) {
+      this.busy = false;
+      this.banner(e instanceof UsbTimeout ? "The PCB is not answering on USB. Check that it is switched on, unplug and plug the cable again, then retry." : "USB error: " + e.message, "err");
+      await this.disconnect(); return;
+    }
+    this.busy = false; await this.refresh();
+  }
+  async disconnect() { const l = this.link; this.link = null; if (l) { try { await l.close(); } catch { } }
+    this.afterClose(); this.log("Disconnected.", "sys"); }
+  onLost() { if (!this.link) return; this.link = null; this.afterClose();
+    this.banner("The PCB was disconnected. Plug it in again and press Connect USB.", "warn"); this.log("USB connection lost.", "e"); }
+  afterClose() { this.allowed = false; this.busy = false; this.setStatus("Not connected");
+    ["usbNSess", "usbFree", "usbState"].forEach((id) => byId(id).textContent = "—"); byId("usbFw").textContent = "";
+    this.sessions = []; this.render(); byId("usbProgWrap").classList.add("hidden"); }
+
+  /* --- PCB contents --- */
+  async refresh() {
+    if (!this.link || this.busy) return;
+    this.busy = true; this.setButtons(); this.banner("");
+    try {
+      const st = kvLines((await this.block("STATUS")).lines);
+      this.allowed = ("download_allowed" in st) ? st.download_allowed === "1" : st.session_active !== "1";
+      const info = kvLines((await this.block("INFO")).lines);
+      const fv = parseInt(info.format_version || "0", 10);
+      byId("usbFw").textContent = `firmware ${info.fw_build || "?"} · ${info.nand || "?"}`;
+      byId("usbNSess").textContent = info.sessions || "—";
+      byId("usbFree").textContent = info.free_seconds ? fmtDuration(+info.free_seconds) : "—";
+      byId("usbState").textContent = this.allowed ? "Ready" : "Recording";
+      if (fv !== USB_FORMAT_VERSION) this.banner(`This PCB stores data in format v${fv}; this app reads v${USB_FORMAT_VERSION}. Ask for an updated app before relying on the files.`, "warn");
+      if (!this.allowed) this.banner("The PCB is recording a session. Stop it first (■ Stop on its PCB page, over Bluetooth), then press Refresh.", "warn");
+      const rows = (await this.block("LIST")).lines.filter((l) => /^\d/.test(l)).map((l) => l.split(","));
+      const old = new Map(this.sessions.map((s) => [s.id + ":" + s.start, s]));
+      this.sessions = [];
+      for (const p of rows) {
+        if (p.length < 7) continue;
+        const s = { idx: +p[0], id: +p[1], records: +p[2], duration: +p[3], start: +p[4], reason: +p[5], recovered: +p[6] === 1, meta: {} };
+        if (s.records > 0) { try { s.meta = usbMeta((await this.block(`HEADER ${s.idx}`)).lines); } catch { } }
+        s.base = usbBaseName(s, s.meta);
+        const prev = old.get(s.id + ":" + s.start);
+        if (prev && (prev.status === "ok" || prev.status === "warn")) { s.status = prev.status; s.lost = prev.lost; }
+        this.sessions.push(s);
+      }
+      await this.checkSaved(false);
+      this.sessions.forEach((s) => { s.sel = s.records > 0 && s.status === "new"; });
+      this.log(`${this.sessions.length} session(s) on the PCB.`, "sys");
+    } catch (e) {
+      this.banner("Could not read the PCB: " + e.message, "err"); await this.resync();
+    } finally { this.busy = false; this.render(); }
+  }
+  /* "On this computer": the .bin exists in the folder with the expected size, and the .csv exists */
+  async checkSaved(ask) {
+    const can = this.dir && await this.dirPermission(ask);
+    byId("usbFolderHint").innerHTML = this.dir && !can
+      ? "Chrome will ask once for permission to use this folder when you press <b>Download</b>."
+      : "For each session two files are written: <b>.csv</b> (opens in Excel) and <b>.bin</b> (raw data, integrity-checked).";
+    for (const s of this.sessions) {
+      if (s.records === 0) { s.status = "empty"; continue; }
+      if (s.status === "ok" || s.status === "warn" || s.status === "busy") continue;
+      s.status = "new"; s.lost = 0;
+      if (!can) continue;
+      try {
+        const bin = await (await this.dir.getFileHandle(s.base + ".bin")).getFile();
+        const csv = await (await this.dir.getFileHandle(s.base + ".csv")).getFile();
+        if (bin.size === s.records * REC_SIZE) {
+          s.status = "saved";
+          if ((await csv.slice(Math.max(0, csv.size - 300)).text()).includes("# ATTENZIONE")) s.lost = 1;
+        }
+      } catch { }
+    }
+  }
+  render() {
+    const tb = byId("usbRows");
+    if (!this.link) tb.innerHTML = `<tr><td colspan="8" class="hint usb-empty">Connect a PCB to see its sessions.</td></tr>`;
+    else if (!this.sessions.length) tb.innerHTML = `<tr><td colspan="8" class="hint usb-empty">${this.busy ? "Reading the PCB…" : "No sessions saved on this PCB."}</td></tr>`;
+    else tb.innerHTML = this.sessions.map((s, i) => {
+      const when = s.start > 0 ? new Date(s.start).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "clock not set";
+      const label = (s.meta.label || "").trim();
+      return `<tr data-i="${i}"><td><input type="checkbox" ${s.sel ? "checked" : ""} ${s.records === 0 || this.busy ? "disabled" : ""}/></td>
+        <td class="num">${s.idx}</td><td>${when}</td><td class="num">${fmtDuration(s.duration / 1000)}</td>
+        <td>${label ? escapeHtml(label) : '<span class="hint">—</span>'}</td><td class="num">${s.records.toLocaleString()}</td>
+        <td>${USB_CLOSE[s.reason] || s.reason}${s.recovered ? " ⚠" : ""}</td><td>${this.statusHtml(s)}</td></tr>`; }).join("");
+    tb.querySelectorAll("input[type=checkbox]").forEach((cb) => cb.onchange = () => {
+      this.sessions[+cb.closest("tr").dataset.i].sel = cb.checked; this.setButtons(); this.selInfo(); });
+    const selectable = this.sessions.filter((s) => s.records > 0);
+    byId("usbAll").checked = selectable.length > 0 && selectable.every((s) => s.sel);
+    byId("usbAll").disabled = !selectable.length || this.busy;
+    this.selInfo(); this.setButtons();
+  }
+  selInfo() { const sel = this.sessions.filter((s) => s.sel && s.records > 0);
+    const mb = sel.reduce((n, s) => n + s.records * REC_SIZE, 0) / 1048576;
+    byId("usbSelInfo").textContent = sel.length ? `${sel.length} selected · ${mb < 0.1 ? "<0.1" : mb.toFixed(1)} MB` : ""; }
+  statusHtml(s) {
+    switch (s.status) {
+      case "empty": return '<span class="st empty">Empty</span>';
+      case "saved": return s.lost ? '<span class="st warn">Saved · some samples unreadable</span>' : '<span class="st saved">Saved</span>';
+      case "ok": return '<span class="st ok">Saved · checked ✓</span>';
+      case "warn": return `<span class="st warn">Saved · ${s.lost} samples unreadable</span>`;
+      case "busy": return `<span class="st busy">Downloading ${s.pct || 0}%</span>`;
+      case "err": return `<span class="st err" title="${escapeHtml(s.err || "")}">Failed — retry</span>`;
+      default: return '<span class="st new">Not yet saved</span>';
+    }
+  }
+
+  /* --- save folder --- */
+  async restoreDir() { const h = await kvStore.get("usbDir"); if (h && h.kind === "directory") { this.dir = h; this.showDir(); } else this.showDir(); }
+  showDir() {
+    const box = byId("usbFolder").parentElement;
+    if (!window.showDirectoryPicker) { byId("usbFolder").textContent = "Downloads folder"; byId("usbPickDir").classList.add("hidden"); box.classList.remove("unset"); return; }
+    byId("usbFolder").textContent = this.dir ? this.dir.name : "No folder chosen";
+    box.classList.toggle("unset", !this.dir);
+    byId("usbPickDir").textContent = this.dir ? "Change…" : "Choose folder…";
+  }
+  async pickDir() {
+    if (!window.showDirectoryPicker) return true;
+    try {
+      const h = await window.showDirectoryPicker({ id: "jlc-usb", mode: "readwrite", startIn: "documents" });
+      this.dir = h; await kvStore.set("usbDir", h); this.showDir(); this.log(`Sessions will be saved in “${h.name}”.`, "sys");
+      if (this.link && !this.busy) { await this.checkSaved(false); this.sessions.forEach((s) => { if (s.status === "saved") s.sel = false; }); this.render(); }
+      return true;
+    } catch (e) { if (e.name !== "AbortError") this.banner("Could not use that folder: " + e.message, "err"); return false; }
+  }
+  async dirPermission(ask) {
+    if (!this.dir) return false;
+    try { const o = { mode: "readwrite" };
+      if (await this.dir.queryPermission(o) === "granted") return true;
+      return ask ? (await this.dir.requestPermission(o)) === "granted" : false; } catch { return false; }
+  }
+  async writeFile(name, data) {
+    if (this.dir) { const fh = await this.dir.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(data); await w.close(); return; }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data])); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+
+  /* --- download --- */
+  async download() {
+    if (!this.link || this.busy) return;
+    if (window.showDirectoryPicker) {               // runs inside the click: Chrome may ask for folder access here
+      if (!this.dir) { if (!await this.pickDir()) return; }
+      else if (!await this.dirPermission(true)) { this.banner(`Chrome needs your permission to write in “${this.dir.name}”. Press Download again and choose “Allow”, or pick another folder.`, "warn"); return; }
+    }
+    await this.checkSaved(false);
+    const skipped = this.sessions.filter((s) => s.sel && s.status === "saved").length;
+    this.sessions.forEach((s) => { if (s.status === "saved") s.sel = false; });
+    const todo = this.sessions.filter((s) => s.sel && s.records > 0 && s.status !== "ok");
+    if (!todo.length) { this.render(); this.banner("The selected sessions are already saved on this computer.", "info"); return; }
+    this.busy = true; this.banner(""); this.render();
+    const totalBytes = todo.reduce((n, s) => n + s.records * REC_SIZE, 0); let doneBytes = 0, okN = 0, lostN = 0;
+    const t0 = performance.now(), prog = byId("usbProgWrap"); prog.classList.remove("hidden");
+    const show = (extra) => { const pct = totalBytes ? Math.round(100 * extra / totalBytes) : 100, dt = (performance.now() - t0) / 1000;
+      byId("usbBar").style.width = pct + "%";
+      byId("usbProgTxt").textContent = `${pct}% · ${(extra / 1048576).toFixed(1)} / ${(totalBytes / 1048576).toFixed(1)} MB` + (dt > 1 ? ` · ${Math.round(extra / 1024 / dt)} kB/s` : ""); };
+    if (skipped) this.log(`${skipped} selected session(s) already on this computer: skipped.`, "sys");
+    for (const s of todo) {
+      if (!this.link) break;
+      s.status = "busy"; s.pct = 0; this.render(); let lastPaint = 0;
+      try {
+        const r = await this.getBin(s.idx, (got) => { const now = performance.now(); if (now - lastPaint < 120) return; lastPaint = now;
+          s.pct = Math.round(100 * got / (s.records * REC_SIZE)); show(doneBytes + got);
+          const cell = byId("usbRows").querySelector(`tr[data-i="${this.sessions.indexOf(s)}"] td:last-child`); if (cell) cell.innerHTML = this.statusHtml(s); });
+        const base = usbBaseName(s, r.meta); s.base = base; s.meta = r.meta;
+        const csv = buildCsvFile(r.header, r.blob);
+        await this.writeFile(base + ".bin", r.blob);
+        await this.writeFile(base + ".csv", csv.text);
+        s.lost = csv.lost; s.status = csv.lost ? "warn" : "ok"; s.sel = false; okN++; if (csv.lost) lostN += csv.lost;
+        this.log(`Session ${s.idx} → ${base}.csv + .bin (${(r.blob.length / 1024).toFixed(0)} kB, CRC ${r.crcChecked ? "checked" : "not sent by firmware"})` +
+          (csv.lost ? ` — ${csv.lost} samples unreadable on the PCB` : ""), csv.lost ? "e" : "rx");
+      } catch (e) {
+        s.status = "err"; s.err = e.message; this.log(`Session ${s.idx}: ${e.message}`, "e");
+        if (e.name === "NotAllowedError" || e.name === "SecurityError") { this.banner("Chrome blocked writing in the folder: choose the folder again.", "err"); break; }
+        await this.resync();
+      }
+      doneBytes += s.records * REC_SIZE; show(doneBytes); this.render();
+    }
+    if (!this.link) { this.banner(`The PCB was disconnected during the download: ${okN} of ${todo.length} sessions were saved. Plug it in again and press Connect USB to continue.`, "err"); return; }
+    this.busy = false; this.render();
+    const where = this.dir ? `the folder “${this.dir.name}”` : "the Downloads folder";
+    const failed = todo.filter((s) => s.status === "err").length;
+    if (failed) this.banner(`${okN} of ${todo.length} sessions saved in ${where}. ${failed} failed: check the cable and press Download again.`, "err");
+    else this.banner(`${okN} session${okN > 1 ? "s" : ""} saved in ${where}` + (lostN ? ` — ${lostN} samples could not be read from the PCB memory (marked in the .csv).` : "."), lostN ? "warn" : "info");
+  }
+
+  /* --- erase (only after everything is safely on the PC) --- */
+  async erase() {
+    if (!this.canErase() || this.busy) return;
+    const n = this.sessions.filter((s) => s.records > 0).length, partial = this.sessions.filter((s) => s.lost).length;
+    if (!confirm(`Erase ALL ${n} sessions from the PCB memory?\n\nThey are saved on this computer, so the PCB can be cleared for new recordings. This cannot be undone.`)) return;
+    if (partial && !confirm(`${partial} session(s) have samples that could not be read from the PCB memory.\nAfter erasing, those samples are lost for good.\n\nErase anyway?`)) return;
+    this.busy = true; this.setButtons();
+    try {
+      const a = await this.ack("ERASE"); if (!a.startsWith("OK")) throw new Error(a.replace(/^ERR\s*/, ""));
+      const b = await this.ack("ERASE CONFIRM"); if (!b.startsWith("OK")) throw new Error(b.replace(/^ERR\s*/, ""));
+      this.setStatus("Erasing…", "busy");
+      let end; do { end = await this.link.q.line(120000); } while (!end.startsWith("END"));
+      this.log("‹ " + end, "rx");
+      const failed = +((/failed=(\d+)/.exec(end) || [])[1] || 0);
+      this.banner(failed ? `Memory erased, but ${failed} blocks could not be erased (worn-out memory areas are skipped automatically).` : "PCB memory erased: ready for new recordings.", failed ? "warn" : "info");
+      this.setStatus("Connected", "on");
+    } catch (e) { this.banner("Erase not done: " + e.message, "err"); await this.resync(); }
+    finally { this.busy = false; }
+    await this.refresh();
+  }
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+/* ====================== app ====================== */
+const CONSOLES=[new JointConsole("A"), new JointConsole("B")];
+const USB=new UsbPage();
+/* One PCB per page. Hidden pages keep their BLE link, stream and capture running. */
+function selectConsole(id){
+  const usb=id==="USB";
+  const c=usb?null:(CONSOLES.find(x=>x.id===id)||CONSOLES[0]);
+  CONSOLES.forEach(x=>{ x.root.classList.toggle("hidden",x!==c); x.tab.classList.toggle("active",x===c); });
+  USB.root.classList.toggle("hidden",!usb); USB.tab.classList.toggle("active",usb);
+  USB.tab.setAttribute("aria-selected",usb?"true":"false");
+  (usb?USB.tab:c.tab).classList.remove("alert","alert-err");
+  CONSOLES.forEach(x=>x.updateTab());
+  savePrefs("jlc3.tab",usb?"USB":c.id);
+}
+selectConsole(loadPrefs("jlc3.tab")||"A");
+document.addEventListener("keydown",e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const t=e.target; if(t&&(t.tagName==="INPUT"||t.tagName==="SELECT"||t.tagName==="TEXTAREA"||t.isContentEditable)) return;
+  if(e.key==="3"){ selectConsole("USB"); return; }
+  const i=["1","2"].indexOf(e.key); if(i>=0&&CONSOLES[i]) selectConsole(CONSOLES[i].id);
+});
+function updateGlobal(){
+  if(!window.CONSOLES) return;
+  const any=CONSOLES.some(c=>c.live);
+  ["allStart","allStop","allMark"].forEach(id=>document.getElementById(id).disabled=!any);
+}
+window.CONSOLES=CONSOLES; updateGlobal();
+const forAll=(cmd)=>CONSOLES.filter(c=>c.live).forEach(c=>c.send(cmd));
+document.getElementById("allStart").onclick=()=>forAll("start");
+document.getElementById("allStop").onclick=()=>forAll("stop");
+document.getElementById("allMark").onclick=()=>forAll("mark 2");
+function frame(){ CONSOLES.forEach(c=>c.draw()); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+/* Version stamped by the packaging build (stays "dev" when opened from the source folder). */
+(()=>{ const v=document.querySelector('meta[name="app-version"]').content; if(!v.startsWith("__")) document.getElementById("appVersion").textContent=v; })();
+/* Offline cache: lets the installed app reload even after its tiny local server has stopped.
+   Only on http(s) — never on file:// or inside previews. */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+if(!navigator.bluetooth){ const b=document.getElementById("gBanner");
+  b.textContent="⚠ No Web Bluetooth in this browser — use Chrome on PC/Mac (on iPad: Bluefy). Demo works anyway."; b.className="banner show warn"; }
+</script>
+</body>
+</html>
